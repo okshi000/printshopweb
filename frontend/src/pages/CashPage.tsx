@@ -29,6 +29,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Pagination } from '@/components/ui'
 import {
   Table,
   TableBody,
@@ -79,7 +80,11 @@ export default function CashPage() {
   const [adjustModalOpen, setAdjustModalOpen] = useState(false)
   const [transferModalOpen, setTransferModalOpen] = useState(false)
   const [initialModalOpen, setInitialModalOpen] = useState(false)
-  const [showAllMovements, setShowAllMovements] = useState(false)
+  const [page, setPage] = useState(1)
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [sourceFilter, setSourceFilter] = useState('all')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
   const { data: balance, isLoading: balanceLoading, error: balanceError } = useQuery({
     queryKey: ['cash', 'balance'],
@@ -90,10 +95,15 @@ export default function CashPage() {
   })
 
   const { data: movements, isLoading: movementsLoading, error: movementsError } = useQuery({
-    queryKey: ['cash', 'movements'],
+    queryKey: ['cash', 'movements', page, typeFilter, sourceFilter, dateFrom, dateTo],
     queryFn: async () => {
-      const res = await cashApi.movements()
-      return res.data.data || res.data
+      const params: any = { page, per_page: 10 }
+      if (typeFilter && typeFilter !== 'all') params.movement_type = typeFilter
+      if (sourceFilter && sourceFilter !== 'all') params.source = sourceFilter
+      if (dateFrom) params.date_from = dateFrom
+      if (dateTo) params.date_to = dateTo
+      const res = await cashApi.movements(params)
+      return res.data
     },
   })
 
@@ -175,28 +185,48 @@ export default function CashPage() {
     )
   }
 
-  const cashBalance = balance?.cash || balance?.cash_balance || 0
-  const bankBalance = balance?.bank || balance?.bank_balance || 0
-  const totalBalance = cashBalance + bankBalance
+  const cashBalance = parseFloat(String(balance?.cash || balance?.cash_balance || 0)) || 0
+  const bankBalance = parseFloat(String(balance?.bank || balance?.bank_balance || 0)) || 0
+  const totalBalance = parseFloat(String(balance?.total_balance || 0)) || (cashBalance + bankBalance)
+
+  // Define income and expense movement types
+  const incomeTypes = ['income', 'initial', 'invoice_payment', 'debt_repayment']
+  const expenseTypes = ['expense', 'withdrawal', 'supplier_payment', 'debt_created']
 
   const today = new Date().toISOString().split('T')[0]
-  const todayMovements = movements?.filter((m: CashMovement) => {
+  const todayMovements = movements?.data?.filter((m: CashMovement) => {
     const date = new Date(m.created_at || m.movement_date || '').toISOString().split('T')[0]
     return date === today
   }) || []
   
+  // Calculate based on movement_type instead of amount sign
   const todayIn = todayMovements
-    .filter((m: CashMovement) => parseFloat(String(m.amount)) > 0)
+    .filter((m: CashMovement) => {
+      const movementType = m.type || m.movement_type
+      return incomeTypes.includes(movementType)
+    })
     .reduce((sum: number, m: CashMovement) => sum + Math.abs(parseFloat(String(m.amount))), 0)
   
   const todayOut = todayMovements
-    .filter((m: CashMovement) => parseFloat(String(m.amount)) < 0)
+    .filter((m: CashMovement) => {
+      const movementType = m.type || m.movement_type
+      return expenseTypes.includes(movementType)
+    })
     .reduce((sum: number, m: CashMovement) => sum + Math.abs(parseFloat(String(m.amount))), 0)
 
   const typeLabels: Record<string, string> = {
-    initial: 'رصيد افتتاحي', invoice_payment: 'دفعة فاتورة', expense: 'مصروف',
-    withdrawal: 'سحب', supplier_payment: 'دفعة مورد', transfer: 'تحويل',
-    adjustment: 'تعديل', debt_repayment: 'سداد دين',
+    initial: 'رصيد افتتاحي',
+    income: 'إيراد',
+    invoice_payment: 'دفعة فاتورة',
+    expense: 'مصروف',
+    withdrawal: 'سحب شخصي',
+    supplier_payment: 'دفعة مورد',
+    transfer: 'تحويل',
+    transfer_in: 'تحويل وارد',
+    transfer_out: 'تحويل صادر',
+    adjustment: 'تسوية',
+    debt_repayment: 'سداد دين',
+    debt_created: 'إنشاء دين',
   }
 
   const balanceCards = [
@@ -288,17 +318,69 @@ export default function CashPage() {
             <CardTitle className="text-lg">آخر الحركات</CardTitle>
           </CardHeader>
           <CardContent>
+            {/* Search Filters */}
+            <div className="mb-6 grid gap-4 md:grid-cols-4">
+              <div className="space-y-2">
+                <Label>نوع الحركة</Label>
+                <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v); setPage(1) }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="جميع الأنواع" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">جميع الأنواع</SelectItem>
+                    <SelectItem value="invoice_payment">دفعة فاتورة</SelectItem>
+                    <SelectItem value="expense">مصروف</SelectItem>
+                    <SelectItem value="debt_repayment">سداد دين</SelectItem>
+                    <SelectItem value="supplier_payment">دفعة مورد</SelectItem>
+                    <SelectItem value="withdrawal">سحب</SelectItem>
+                    <SelectItem value="adjustment">تسوية</SelectItem>
+                    <SelectItem value="transfer">تحويل</SelectItem>
+                    <SelectItem value="initial">رصيد افتتاحي</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>المصدر</Label>
+                <Select value={sourceFilter} onValueChange={(v) => { setSourceFilter(v); setPage(1) }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="جميع المصادر" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">جميع المصادر</SelectItem>
+                    <SelectItem value="cash">الكاش</SelectItem>
+                    <SelectItem value="bank">المصرف</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>من تاريخ</Label>
+                <Input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => { setDateFrom(e.target.value); setPage(1) }}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>إلى تاريخ</Label>
+                <Input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => { setDateTo(e.target.value); setPage(1) }}
+                />
+              </div>
+            </div>
+
             {movementsLoading ? (
               <div className="flex h-40 items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
-            ) : movements?.length === 0 ? (
+            ) : movements?.data?.length === 0 ? (
               <div className="flex h-40 flex-col items-center justify-center gap-2 text-muted-foreground">
                 <AlertCircle className="h-10 w-10" />
                 <p>لا توجد حركات مالية</p>
               </div>
             ) : (
-              <ScrollArea className="h-[400px]">
+              <>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -311,10 +393,11 @@ export default function CashPage() {
                   </TableHeader>
                   <TableBody>
                     <AnimatePresence mode="popLayout">
-                      {movements?.slice(0, showAllMovements ? movements.length : 20).map((movement: CashMovement, index: number) => {
-                        const isPositive = parseFloat(String(movement.amount)) > 0
+                      {movements?.data?.map((movement: CashMovement, index: number) => {
                         const movementType = movement.type || movement.movement_type
+                        const isIncome = incomeTypes.includes(movementType)
                         const sourceLabel = movement.source === 'cash' ? 'الكاش' : 'المصرف'
+                        const amount = Math.abs(parseFloat(String(movement.amount)))
                         return (
                           <motion.tr
                             key={movement.id}
@@ -338,9 +421,9 @@ export default function CashPage() {
                             </TableCell>
                             <TableCell className="text-left">
                               <div className="flex items-center justify-start gap-1">
-                                {isPositive ? <ArrowUpRight className="h-4 w-4 text-emerald-500" /> : <ArrowDownRight className="h-4 w-4 text-red-500" />}
-                                <span className={cn('font-semibold', isPositive ? 'text-emerald-600' : 'text-red-600')}>
-                                  {isPositive ? '+' : ''}{formatCurrency(parseFloat(String(movement.amount)))}
+                                {isIncome ? <ArrowUpRight className="h-4 w-4 text-emerald-500" /> : <ArrowDownRight className="h-4 w-4 text-red-500" />}
+                                <span className={cn('font-semibold', isIncome ? 'text-emerald-600' : 'text-red-600')}>
+                                  {isIncome ? '+' : '-'}{formatCurrency(amount)}
                                 </span>
                               </div>
                             </TableCell>
@@ -350,17 +433,18 @@ export default function CashPage() {
                     </AnimatePresence>
                   </TableBody>
                 </Table>
-                {movements && movements.length > 20 && (
-                  <div className="flex justify-center pt-4">
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowAllMovements(!showAllMovements)}
-                    >
-                      {showAllMovements ? 'عرض أقل' : `عرض المزيد (${movements.length - 20})`}
-                    </Button>
+                {movements && (
+                  <div className="mt-4">
+                    <Pagination
+                      currentPage={movements.current_page}
+                      totalPages={movements.last_page}
+                      onPageChange={setPage}
+                      totalItems={movements.total}
+                      perPage={movements.per_page}
+                    />
                   </div>
                 )}
-              </ScrollArea>
+              </>
             )}
           </CardContent>
         </Card>

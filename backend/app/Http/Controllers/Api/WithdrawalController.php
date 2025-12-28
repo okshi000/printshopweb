@@ -27,7 +27,7 @@ class WithdrawalController extends Controller
         }
 
         $withdrawals = $query->orderBy('withdrawal_date', 'desc')
-            ->paginate($request->per_page ?? 15);
+            ->paginate($request->per_page ?? 10);
 
         return response()->json($withdrawals);
     }

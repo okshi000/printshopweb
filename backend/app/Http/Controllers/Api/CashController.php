@@ -43,7 +43,7 @@ class CashController extends Controller
         }
 
         $movements = $query->orderBy('movement_date', 'desc')
-            ->paginate($request->per_page ?? 20);
+            ->paginate($request->per_page ?? 10);
 
         return response()->json($movements);
     }
@@ -116,7 +116,7 @@ class CashController extends Controller
         CashMovement::create([
             'movement_type' => $movementType,
             'source' => $validated['source'],
-            'amount' => abs($validated['amount']),
+            'amount' => $validated['amount'], // Keep original sign for tracking
             'description' => "تسوية: {$validated['description']}",
         ]);
 

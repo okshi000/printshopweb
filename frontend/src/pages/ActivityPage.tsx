@@ -74,16 +74,27 @@ const actionLabels: Record<string, string> = {
 }
 
 const entityLabels: Record<string, string> = {
+  invoices: 'فاتورة',
   invoice: 'فاتورة',
+  customers: 'عميل',
   customer: 'عميل',
+  products: 'منتج',
   product: 'منتج',
+  expenses: 'مصروف',
   expense: 'مصروف',
+  users: 'مستخدم',
   user: 'مستخدم',
+  suppliers: 'مورد',
   supplier: 'مورد',
   inventory: 'مخزون',
   cash: 'خزينة',
+  withdrawals: 'سحب',
   withdrawal: 'سحب',
+  debts: 'دين',
   debt: 'دين',
+  payments: 'دفعة',
+  payment: 'دفعة',
+  other: 'آخر',
 }
 
 export default function ActivityPage() {
@@ -96,7 +107,7 @@ export default function ActivityPage() {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['activity', { search, actionFilter, entityFilter, dateRange, page }],
     queryFn: async () => {
-      const params: Record<string, unknown> = { page, per_page: 20 }
+      const params: Record<string, unknown> = { page, per_page: 10 }
       if (search) params.search = search
       if (actionFilter !== 'all') params.action = actionFilter
       if (entityFilter !== 'all') params.entity_type = entityFilter
@@ -108,7 +119,7 @@ export default function ActivityPage() {
   })
 
   const activities: ActivityLog[] = data?.data || []
-  const pagination = data?.meta || { last_page: 1 }
+  const pagination = { current_page: data?.current_page || 1, last_page: data?.last_page || 1 }
 
   if (error) {
     return (
@@ -266,7 +277,7 @@ export default function ActivityPage() {
                             {' '}
                             <span className="inline-flex items-center gap-1">
                               {entityIcons[activity.entity_type]}
-                              {entityLabels[activity.entity_type] || activity.entity_type}
+                              {entityLabels[activity.entity_type?.toLowerCase()] || entityLabels[activity.entity_type] || activity.entity_type}
                             </span>
                             {activity.entity_name && (
                               <span className="font-semibold"> "{activity.entity_name}"</span>
@@ -299,18 +310,18 @@ export default function ActivityPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => setPage(page - 1)}
-                  disabled={page === 1}
+                  disabled={pagination.current_page === 1}
                 >
                   السابق
                 </Button>
                 <span className="text-sm text-muted-foreground">
-                  صفحة {page} من {pagination.last_page}
+                  صفحة {pagination.current_page} من {pagination.last_page}
                 </span>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setPage(page + 1)}
-                  disabled={page === pagination.last_page}
+                  disabled={pagination.current_page === pagination.last_page}
                 >
                   التالي
                 </Button>

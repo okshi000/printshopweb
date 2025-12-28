@@ -115,6 +115,7 @@ export interface ExpenseType {
   name: string;
   description: string | null;
   is_active: boolean;
+  expenses_count?: number;
 }
 
 export interface Expense {
@@ -154,7 +155,7 @@ export interface CashBalance {
 
 export interface CashMovement {
   id: number;
-  movement_type: 'income' | 'expense' | 'transfer' | 'withdrawal' | 'initial';
+  movement_type: 'income' | 'expense' | 'transfer' | 'withdrawal' | 'initial' | 'invoice_payment' | 'supplier_payment' | 'debt_repayment' | 'debt_created';
   type?: string;
   source: 'cash' | 'bank';
   destination: 'cash' | 'bank' | null;
@@ -189,9 +190,29 @@ export interface InventoryMovement {
   inventory_item?: InventoryItem;
 }
 
+export interface DebtAccount {
+  id: number;
+  name: string;
+  phone: string | null;
+  notes: string | null;
+  is_active: boolean;
+  total_debt: number;
+  total_paid: number;
+  balance: number;
+  debts_count?: number;
+  active_debts_count?: number;
+  debts?: Debt[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Debt {
   id: number;
+  debt_account_id: number | null;
+  debt_account?: DebtAccount;
   debtor_name: string;
+  source: 'cash' | 'bank';
+  source_label?: string;
   description?: string;
   amount: number;
   paid_amount?: number;
@@ -244,3 +265,6 @@ export interface PaginatedResponse<T> {
   per_page: number;
   total: number;
 }
+
+// تصدير أنواع التقارير
+export * from './reports';

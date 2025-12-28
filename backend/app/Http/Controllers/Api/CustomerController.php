@@ -30,7 +30,7 @@ class CustomerController extends Controller
         $customers = $query->withCount('invoices')
             ->withSum('invoices', 'remaining_amount')
             ->orderBy('name')
-            ->paginate($request->per_page ?? 15);
+            ->paginate($request->per_page ?? 10);
 
         return response()->json($customers);
     }
@@ -59,7 +59,17 @@ class CustomerController extends Controller
         }]);
         
         $customer->loadCount('invoices');
-        $customer->total_debt = $customer->invoices()->sum('remaining_amount');
+        
+        // Calculate statistics
+        $totalAmount = $customer->invoices()->sum('total_amount');
+        $paidAmount = $customer->invoices()->sum('paid_amount');
+        $remainingAmount = $customer->invoices()->sum('remaining_amount');
+        
+        $customer->total_invoices = $customer->invoices_count;
+        $customer->total_amount = $totalAmount;
+        $customer->paid_amount = $paidAmount;
+        $customer->remaining_amount = $remainingAmount;
+        $customer->total_debt = $remainingAmount; // For backward compatibility
 
         return response()->json($customer);
     }

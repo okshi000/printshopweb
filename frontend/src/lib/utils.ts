@@ -136,11 +136,41 @@ export function getStatusColor(status: string): string {
 
 export function getStatusLabel(status: string): string {
   const labels: Record<string, string> = {
+    new: 'جديدة',
     draft: 'مسودة',
-    pending: 'معلقة',
+    pending: 'قيد الانتظار',
+    in_progress: 'قيد التنفيذ',
+    ready: 'جاهزة',
+    delivered: 'تم التسليم',
+    completed: 'مكتملة',
     partial: 'مدفوعة جزئياً',
     paid: 'مدفوعة',
     cancelled: 'ملغية',
   }
   return labels[status] || status
+}
+
+// Payment status utilities
+export function getPaymentStatus(total: number, paid: number): 'unpaid' | 'partial' | 'paid' {
+  if (paid === 0) return 'unpaid'
+  if (paid >= total) return 'paid'
+  return 'partial'
+}
+
+export function getPaymentStatusColor(status: 'unpaid' | 'partial' | 'paid'): string {
+  const colors: Record<string, string> = {
+    unpaid: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
+    partial: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300',
+    paid: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
+  }
+  return colors[status]
+}
+
+export function getPaymentStatusLabel(status: 'unpaid' | 'partial' | 'paid'): string {
+  const labels: Record<string, string> = {
+    unpaid: 'لم تدفع',
+    partial: 'مدفوعة جزئياً',
+    paid: 'مدفوعة بالكامل',
+  }
+  return labels[status]
 }

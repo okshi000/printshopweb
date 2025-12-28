@@ -76,6 +76,11 @@ interface Role {
   users_count: number;
 }
 
+interface Permission {
+  name: string;
+  label: string;
+}
+
 const userSchema = z.object({
   name: z.string().min(1, 'الاسم مطلوب'),
   email: z.string().email('بريد إلكتروني غير صالح'),
@@ -128,7 +133,7 @@ export default function UsersPage() {
     },
   });
 
-  const { data: permissions } = useQuery<string[]>({
+  const { data: permissions } = useQuery<Permission[]>({
     queryKey: ['permissions'],
     queryFn: async () => {
       const res = await api.get('/permissions');
@@ -676,30 +681,38 @@ export default function UsersPage() {
             <div className="space-y-2">
               <Label>الصلاحيات</Label>
               <ScrollArea className="h-60 rounded-md border p-4">
-                <div className="grid grid-cols-2 gap-3">
-                  {permissions?.map((permission) => (
-                    <div key={permission} className="flex items-center space-x-2 space-x-reverse">
-                      <Checkbox
-                        id={permission}
-                        checked={roleForm.watch('permissions').includes(permission)}
-                        onCheckedChange={(checked) => {
-                          const current = roleForm.watch('permissions');
-                          if (checked) {
-                            roleForm.setValue('permissions', [...current, permission]);
-                          } else {
-                            roleForm.setValue('permissions', current.filter(p => p !== permission));
-                          }
-                        }}
-                      />
-                      <label
-                        htmlFor={permission}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        {permission}
-                      </label>
-                    </div>
-                  ))}
-                </div>
+                {!permissions || permissions.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
+                    <Shield className="h-12 w-12 mb-2 opacity-50" />
+                    <p className="text-sm">لا توجد صلاحيات متاحة</p>
+                    <p className="text-xs mt-1">يرجى تشغيل php artisan db:seed</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {permissions.map((permission) => (
+                      <div key={permission.name} className="flex items-center space-x-2 space-x-reverse">
+                        <Checkbox
+                          id={permission.name}
+                          checked={roleForm.watch('permissions').includes(permission.name)}
+                          onCheckedChange={(checked) => {
+                            const current = roleForm.watch('permissions');
+                            if (checked) {
+                              roleForm.setValue('permissions', [...current, permission.name]);
+                            } else {
+                              roleForm.setValue('permissions', current.filter(p => p !== permission.name));
+                            }
+                          }}
+                        />
+                        <label
+                          htmlFor={permission.name}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          {permission.label}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </ScrollArea>
             </div>
 

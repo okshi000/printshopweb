@@ -74,19 +74,36 @@ type ProductFormData = z.infer<typeof productSchema>;
 export default function ProductsPage() {
   const queryClient = useQueryClient();
   const { hasPermission } = useAuth();
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
 
-  const { data: products, isLoading, error } = useQuery({
-    queryKey: ['products'],
+  // Debounce search
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    const timeoutId = setTimeout(() => {
+      setDebouncedSearch(value);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timeoutId);
+  };
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['products', page, debouncedSearch],
     queryFn: async () => {
-      const res = await productsApi.list();
-      return res.data.data || res.data;
+      const params: Record<string, string | number> = { page, per_page: 10 };
+      if (debouncedSearch) params.search = debouncedSearch;
+      const res = await productsApi.list(params);
+      return res.data;
     },
   });
+
+  const products = data?.data || [];
 
   const { data: categories } = useQuery({
     queryKey: ['categories'],
@@ -244,12 +261,28 @@ export default function ProductsPage() {
         )}
       </div>
 
+      {/* Search */}
+      <Card className="shadow-soft">
+        <CardContent className="p-4">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="بحث عن منتج..."
+              value={search}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="w-full pr-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">🔍</span>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Main Content */}
       <Card className="shadow-soft">
         <CardHeader className="border-b border-border/50 pb-4">
           <CardTitle className="text-lg">قائمة المنتجات</CardTitle>
           <CardDescription>
-            {products?.length || 0} منتج مسجل
+            {data?.total || 0} منتج مسجل
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -391,6 +424,31 @@ export default function ProductsPage() {
                   </AnimatePresence>
                 </TableBody>
               </Table>
+
+              {/* Pagination */}
+              {data && data.last_page > 1 && (
+                <div className="flex items-center justify-center gap-2 p-4 border-t border-border/50">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                  >
+                    السابق
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    صفحة {data.current_page} من {data.last_page}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.min(data.last_page, p + 1))}
+                    disabled={page === data.last_page}
+                  >
+                    التالي
+                  </Button>
+                </div>
+              )}
 
               {/* Empty State */}
               {products?.length === 0 && (

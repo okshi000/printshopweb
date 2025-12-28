@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -71,12 +71,13 @@ export default function CustomersPage() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
 
   const { data, isLoading, error, refetch } = useQuery<PaginatedResponse<Customer>>({
     queryKey: ['customers', page, search],
     queryFn: async () => {
-      const res = await customersApi.list({ page, search, per_page: 15 });
+      const res = await customersApi.list({ page, search, per_page: 10 });
       return res.data;
     },
   });
@@ -143,6 +144,19 @@ export default function CustomersPage() {
     });
     setModalOpen(true);
   };
+
+  // Check if edit parameter is present in URL
+  useEffect(() => {
+    const editId = searchParams.get('edit');
+    if (editId && data?.data) {
+      const customer = data.data.find((c: Customer) => c.id.toString() === editId);
+      if (customer) {
+        handleEdit(customer);
+        // Remove the edit parameter from URL
+        setSearchParams({});
+      }
+    }
+  }, [searchParams, data?.data]);
 
   const onSubmit = (values: CustomerFormData) => {
     if (selectedCustomer) {

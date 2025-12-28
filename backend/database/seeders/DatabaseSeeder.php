@@ -53,12 +53,12 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($permissions as $name => $description) {
-            Permission::create(['name' => $name, 'guard_name' => 'web']);
+            Permission::firstOrCreate(['name' => $name, 'guard_name' => 'web']);
         }
 
-        // Create roles
-        $ownerRole = Role::create(['name' => 'owner', 'guard_name' => 'web']);
-        $employeeRole = Role::create(['name' => 'employee', 'guard_name' => 'web']);
+        // Create roles (idempotent)
+        $ownerRole = Role::firstOrCreate(['name' => 'owner', 'guard_name' => 'web']);
+        $employeeRole = Role::firstOrCreate(['name' => 'employee', 'guard_name' => 'web']);
 
         // Owner gets all permissions
         $ownerRole->givePermissionTo(Permission::all());
@@ -74,15 +74,19 @@ class DatabaseSeeder extends Seeder
             'products.view',
         ]);
 
-        // Create default admin user
-        $admin = User::create([
-            'name' => 'admin',
-            'email' => 'admin@printshop.com',
-            'password' => bcrypt('password'),
-            'full_name' => 'مدير النظام',
-            'role' => 'owner',
-        ]);
-        $admin->assignRole('owner');
+        // Create or update default admin user
+        $admin = User::updateOrCreate(
+            ['email' => 'admin@printshop.com'],
+            [
+                'name' => 'admin',
+                'password' => bcrypt('password'),
+                'full_name' => 'مدير النظام',
+                'role' => 'owner',
+            ]
+        );
+        if (! $admin->hasRole('owner')) {
+            $admin->assignRole('owner');
+        }
 
         // Create expense types
         $expenseTypes = [
@@ -98,7 +102,7 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($expenseTypes as $type) {
-            ExpenseType::create(['name' => $type]);
+            ExpenseType::firstOrCreate(['name' => $type]);
         }
 
         // Create categories
@@ -112,8 +116,9 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($categories as $name => $description) {
-            Category::create([
+            Category::firstOrCreate([
                 'name' => $name,
+            ], [
                 'description' => $description,
             ]);
         }

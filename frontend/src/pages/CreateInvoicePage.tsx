@@ -6,7 +6,7 @@ import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { ar } from 'date-fns/locale'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   Plus, Trash2, ArrowLeft, Package, Coins, Receipt, Loader2, Calendar as CalendarIcon
 } from 'lucide-react'
@@ -47,6 +47,7 @@ interface InvoiceItem {
 export default function CreateInvoicePage() {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
+  const [searchParams] = useSearchParams()
   const isEditMode = !!id
   
   const [items, setItems] = useState<InvoiceItem[]>([])
@@ -54,6 +55,17 @@ export default function CreateInvoicePage() {
   const [deliveryDate, setDeliveryDate] = useState<Date | null>(null)
   const [notes, setNotes] = useState('')
   const [isLoadingInvoice, setIsLoadingInvoice] = useState(false)
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [productSearch, setProductSearch] = useState('')
+  const [supplierSearch, setSupplierSearch] = useState('')
+
+  // Set customer from URL parameter if provided
+  useEffect(() => {
+    const customerParam = searchParams.get('customer')
+    if (customerParam && !isEditMode) {
+      setCustomerId(customerParam)
+    }
+  }, [searchParams, isEditMode])
 
   // Load invoice data when in edit mode
   useEffect(() => {
@@ -93,25 +105,31 @@ export default function CreateInvoicePage() {
   }, [isEditMode, id])
 
   const { data: customers, isLoading: customersLoading } = useQuery({
-    queryKey: ['customers'],
+    queryKey: ['customers', customerSearch],
     queryFn: async () => {
-      const res = await customersApi.list({ active_only: true })
+      const params: any = { active_only: true }
+      if (customerSearch) params.search = customerSearch
+      const res = await customersApi.list(params)
       return res.data.data || res.data
     },
   })
 
   const { data: products, isLoading: productsLoading } = useQuery({
-    queryKey: ['products'],
+    queryKey: ['products', productSearch],
     queryFn: async () => {
-      const res = await productsApi.list()
+      const params: any = {}
+      if (productSearch) params.search = productSearch
+      const res = await productsApi.list(params)
       return res.data.data || res.data
     },
   })
 
   const { data: suppliers } = useQuery({
-    queryKey: ['suppliers'],
+    queryKey: ['suppliers', supplierSearch],
     queryFn: async () => {
-      const res = await suppliersApi.list({ active_only: true })
+      const params: any = { active_only: true }
+      if (supplierSearch) params.search = supplierSearch
+      const res = await suppliersApi.list(params)
       return res.data.data || res.data
     },
   })
@@ -183,7 +201,7 @@ export default function CreateInvoicePage() {
   }
 
   const subtotal = useMemo(() => items.reduce((sum, item) => sum + (item.quantity * item.price), 0), [items])
-  const totalCosts = useMemo(() => items.reduce((sum, item) => sum + item.costs.reduce((cs, c) => cs + c.amount, 0), 0), [items])
+  const totalCosts = useMemo(() => items.reduce((sum, item) => sum + item.costs.reduce((cs, c) => cs + (parseFloat(String(c.amount)) || 0), 0), 0), [items])
 
   const handleSubmit = () => {
     if (!customerId) {
@@ -254,6 +272,14 @@ export default function CreateInvoicePage() {
                   <Select value={customerId} onValueChange={setCustomerId}>
                     <SelectTrigger><SelectValue placeholder="اختر العميل" /></SelectTrigger>
                     <SelectContent>
+                      <div className="px-2 pb-2">
+                        <Input
+                          placeholder="ابحث عن عميل..."
+                          value={customerSearch}
+                          onChange={(e) => setCustomerSearch(e.target.value)}
+                          className="h-8"
+                        />
+                      </div>
                       {customers?.map((c: Customer) => (
                         <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
                       ))}
@@ -312,6 +338,14 @@ export default function CreateInvoicePage() {
                           <Select value={item.product_id || ''} onValueChange={(v) => selectProduct(item.id, v)}>
                             <SelectTrigger><SelectValue placeholder="اختر المنتج" /></SelectTrigger>
                             <SelectContent>
+                              <div className="px-2 pb-2">
+                                <Input
+                                  placeholder="ابحث عن منتج..."
+                                  value={productSearch}
+                                  onChange={(e) => setProductSearch(e.target.value)}
+                                  className="h-8"
+                                />
+                              </div>
                               {products?.map((p: Product) => (
                                 <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
                               ))}
@@ -347,6 +381,14 @@ export default function CreateInvoicePage() {
                               <Select value={cost.supplier_id || ''} onValueChange={(v) => updateCost(item.id, cost.id, 'supplier_id', v)}>
                                 <SelectTrigger className="h-9"><SelectValue placeholder="اختر" /></SelectTrigger>
                                 <SelectContent>
+                                  <div className="px-2 pb-2">
+                                    <Input
+                                      placeholder="ابحث عن مورد..."
+                                      value={supplierSearch}
+                                      onChange={(e) => setSupplierSearch(e.target.value)}
+                                      className="h-8"
+                                    />
+                                  </div>
                                   {suppliers?.map((s: Supplier) => (
                                     <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
                                   ))}

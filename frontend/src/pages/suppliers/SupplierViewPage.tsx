@@ -47,7 +47,7 @@ interface Payment {
   id: number
   amount: number
   payment_method: string
-  payment_date: string
+  created_at: string
   notes?: string
 }
 
@@ -292,7 +292,7 @@ export default function SupplierViewPage() {
                     <TableBody>
                       {supplier.payments?.map((payment) => (
                         <TableRow key={payment.id}>
-                          <TableCell>{formatDate(payment.payment_date, 'dd/MM/yyyy')}</TableCell>
+                          <TableCell>{formatDate(payment.created_at, 'dd/MM/yyyy')}</TableCell>
                           <TableCell>
                             <Badge variant="outline">
                               {payment.payment_method === 'cash' ? 'نقدي' : payment.payment_method === 'bank' ? 'بنكي' : payment.payment_method}

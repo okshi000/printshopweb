@@ -12,18 +12,32 @@ class DebtController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = Debt::query();
+        $query = Debt::with('debtAccount');
 
         if ($request->has('search')) {
-            $query->where('debtor_name', 'like', "%{$request->search}%");
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('debtor_name', 'like', "%{$search}%")
+                  ->orWhereHas('debtAccount', function ($q2) use ($search) {
+                      $q2->where('name', 'like', "%{$search}%");
+                  });
+            });
         }
 
         if ($request->has('is_paid')) {
             $query->where('is_paid', $request->is_paid === 'true');
         }
 
+        if ($request->has('debt_account_id')) {
+            $query->where('debt_account_id', $request->debt_account_id);
+        }
+
+        if ($request->has('source')) {
+            $query->where('source', $request->source);
+        }
+
         $debts = $query->orderBy('debt_date', 'desc')
-            ->paginate($request->per_page ?? 15);
+            ->paginate($request->per_page ?? 10);
 
         return response()->json($debts);
     }
@@ -31,7 +45,9 @@ class DebtController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
+            'debt_account_id' => 'nullable|exists:debt_accounts,id',
             'debtor_name' => 'required|string|max:100',
+            'source' => 'required|in:cash,bank',
             'amount' => 'required|numeric|min:0.01',
             'debt_date' => 'required|date',
             'due_date' => 'nullable|date|after_or_equal:debt_date',
@@ -39,22 +55,24 @@ class DebtController extends Controller
         ]);
 
         $validated['remaining_amount'] = $validated['amount'];
+        $validated['paid_amount'] = 0;
 
         $debt = Debt::create($validated);
 
+        $sourceLabel = $validated['source'] === 'bank' ? 'البنك' : 'الكاش';
         ActivityLog::log(
             'create',
             'debts',
-            "إضافة دين من {$validated['debtor_name']} بمبلغ {$validated['amount']}",
+            "إضافة دين من {$validated['debtor_name']} بمبلغ {$validated['amount']} من {$sourceLabel}",
             $debt->id
         );
 
-        return response()->json($debt, 201);
+        return response()->json($debt->load('debtAccount'), 201);
     }
 
     public function show(Debt $debt): JsonResponse
     {
-        $debt->load('repayments');
+        $debt->load(['repayments', 'debtAccount']);
 
         return response()->json($debt);
     }
@@ -80,7 +98,7 @@ class DebtController extends Controller
             $debt->id
         );
 
-        return response()->json($debt->fresh('repayments'));
+        return response()->json($debt->fresh(['repayments', 'debtAccount']));
     }
 
     public function destroy(Debt $debt): JsonResponse

@@ -28,7 +28,7 @@ class ProductController extends Controller
         }
 
         $products = $query->orderBy('name')
-            ->paginate($request->per_page ?? 15);
+            ->paginate($request->per_page ?? 10);
 
         return response()->json($products);
     }

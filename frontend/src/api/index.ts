@@ -100,6 +100,7 @@ export const invoicesApi = {
   delete: (id: number) => api.delete(`/invoices/${id}`),
   updateStatus: (id: number, status: string) => api.patch(`/invoices/${id}/status`, { status }),
   addPayment: (id: number, data: Record<string, unknown>) => api.post(`/invoices/${id}/payments`, data),
+  statistics: (params?: Record<string, unknown>) => api.get('/invoices-statistics', { params }),
 };
 
 // Expenses API
@@ -109,6 +110,8 @@ export const expensesApi = {
   delete: (id: number) => api.delete(`/expenses/${id}`),
   types: () => api.get('/expense-types'),
   createType: (data: Record<string, unknown>) => api.post('/expense-types', data),
+  updateType: (id: number, data: Record<string, unknown>) => api.put(`/expense-types/${id}`, data),
+  deleteType: (id: number) => api.delete(`/expense-types/${id}`),
 };
 
 // Withdrawals API
@@ -149,6 +152,16 @@ export const debtsApi = {
   repay: (id: number, data: Record<string, unknown>) => api.post(`/debts/${id}/repay`, data),
 };
 
+// Debt Accounts API
+export const debtAccountsApi = {
+  list: (params?: Record<string, unknown>) => api.get('/debt-accounts', { params }),
+  all: () => api.get('/debt-accounts-all'),
+  get: (id: number) => api.get(`/debt-accounts/${id}`),
+  create: (data: Record<string, unknown>) => api.post('/debt-accounts', data),
+  update: (id: number, data: Record<string, unknown>) => api.put(`/debt-accounts/${id}`, data),
+  delete: (id: number) => api.delete(`/debt-accounts/${id}`),
+};
+
 // Activity Log API
 export const activityApi = {
   list: (params?: Record<string, unknown>) => api.get('/activity-logs', { params }),
@@ -176,3 +189,6 @@ export const accountantApi = {
   getIncomeStatement: (params?: Record<string, unknown>) => api.get('/accountant/income-statement', { params }),
   getBalanceSheet: (params?: Record<string, unknown>) => api.get('/accountant/balance-sheet', { params }),
 };
+
+// تصدير APIs التقارير
+export * from './reports';

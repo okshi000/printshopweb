@@ -10,13 +10,15 @@ import {
 
 interface PieChartComponentProps {
   data: any[];
-  dataKey: string;
+  dataKey?: string;
+  valueKey?: string; // alias for dataKey for backward compatibility
   nameKey: string;
   height?: number;
   title?: string;
   colors?: string[];
   formatValue?: (value: number) => string;
   showPercentage?: boolean;
+  showLegend?: boolean;
 }
 
 const DEFAULT_COLORS = [
@@ -35,13 +37,18 @@ const DEFAULT_COLORS = [
 export const PieChartComponent: React.FC<PieChartComponentProps> = ({
   data,
   dataKey,
+  valueKey,
   nameKey,
   height = 300,
   title,
   colors = DEFAULT_COLORS,
   formatValue = (value) => value.toLocaleString(),
   showPercentage = true,
+  showLegend = true,
 }) => {
+  // Use valueKey as alias for dataKey
+  const actualDataKey = dataKey || valueKey || 'value';
+  
   const renderCustomLabel = (entry: any) => {
     if (!showPercentage) return '';
     return `${entry.percentage || entry.percent || ''}%`;
@@ -62,7 +69,7 @@ export const PieChartComponent: React.FC<PieChartComponentProps> = ({
             label={renderCustomLabel}
             outerRadius={80}
             fill="#8884d8"
-            dataKey={dataKey}
+            dataKey={actualDataKey}
             nameKey={nameKey}
           >
             {data.map((_, index) => (
@@ -81,11 +88,13 @@ export const PieChartComponent: React.FC<PieChartComponentProps> = ({
               padding: '8px 12px',
             }}
           />
-          <Legend
-            verticalAlign="bottom"
-            height={36}
-            iconType="circle"
-          />
+          {showLegend && (
+            <Legend
+              verticalAlign="bottom"
+              height={36}
+              iconType="circle"
+            />
+          )}
         </PieChart>
       </ResponsiveContainer>
     </div>

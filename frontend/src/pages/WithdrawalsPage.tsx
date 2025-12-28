@@ -44,15 +44,18 @@ const withdrawalSchema = z.object({
 export default function WithdrawalsPage() {
   const queryClient = useQueryClient()
   const { hasPermission } = useAuth()
+  const [page, setPage] = useState(1)
   const [modalOpen, setModalOpen] = useState(false)
 
-  const { data: withdrawals, isLoading, error } = useQuery({
-    queryKey: ['withdrawals'],
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['withdrawals', page],
     queryFn: async () => {
-      const res = await withdrawalsApi.list()
-      return res.data.data || res.data
+      const res = await withdrawalsApi.list({ page, per_page: 10 })
+      return res.data
     },
   })
+
+  const withdrawals = data?.data || []
 
   const form = useForm<z.infer<typeof withdrawalSchema>>({
     resolver: zodResolver(withdrawalSchema),
@@ -174,7 +177,7 @@ export default function WithdrawalsPage() {
                           {sourceLabels[withdrawal.source || 'cash'] || withdrawal.source}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{withdrawal.reason}</TableCell>
+                      <TableCell className="text-muted-foreground">{withdrawal.notes || '-'}</TableCell>
                       <TableCell>{withdrawal.user?.name || '-'}</TableCell>
                       <TableCell>
                         {hasPermission('delete withdrawals') && (
@@ -188,6 +191,30 @@ export default function WithdrawalsPage() {
                 </AnimatePresence>
               </TableBody>
             </Table>
+            {/* Pagination */}
+            {data && data.last_page > 1 && (
+              <div className="flex items-center justify-center gap-2 p-4 border-t border-border/50">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                >
+                  السابق
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  صفحة {data.current_page} من {data.last_page}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(p => Math.min(data.last_page, p + 1))}
+                  disabled={page === data.last_page}
+                >
+                  التالي
+                </Button>
+              </div>
+            )}
             {withdrawals?.length === 0 && (
               <div className="py-12 text-center text-muted-foreground">لا توجد سحوبات</div>
             )}

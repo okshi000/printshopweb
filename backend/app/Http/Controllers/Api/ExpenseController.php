@@ -32,7 +32,7 @@ class ExpenseController extends Controller
         }
 
         $expenses = $query->orderBy('expense_date', 'desc')
-            ->paginate($request->per_page ?? 15);
+            ->paginate($request->per_page ?? 10);
 
         return response()->json($expenses);
     }
@@ -72,18 +72,53 @@ class ExpenseController extends Controller
     // Expense Types
     public function types(): JsonResponse
     {
-        return response()->json(ExpenseType::active()->get());
+        $types = ExpenseType::withCount('expenses')->orderBy('name')->get();
+        return response()->json($types);
     }
 
     public function storeType(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:100',
+            'name' => 'required|string|max:100|unique:expense_types,name',
             'description' => 'nullable|string',
         ]);
 
         $type = ExpenseType::create($validated);
 
+        ActivityLog::log('create', 'expense_types', "إضافة نوع مصروف: {$type->name}", $type->id);
+
         return response()->json($type, 201);
+    }
+
+    public function updateType(Request $request, ExpenseType $expenseType): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:100|unique:expense_types,name,' . $expenseType->id,
+            'description' => 'nullable|string',
+            'is_active' => 'boolean',
+        ]);
+
+        $expenseType->update($validated);
+
+        ActivityLog::log('update', 'expense_types', "تحديث نوع مصروف: {$expenseType->name}", $expenseType->id);
+
+        return response()->json($expenseType);
+    }
+
+    public function destroyType(ExpenseType $expenseType): JsonResponse
+    {
+        // Check if type has expenses
+        if ($expenseType->expenses()->exists()) {
+            return response()->json([
+                'message' => 'لا يمكن حذف هذا النوع لوجود مصروفات مرتبطة به'
+            ], 422);
+        }
+
+        $typeName = $expenseType->name;
+        $expenseType->delete();
+
+        ActivityLog::log('delete', 'expense_types', "حذف نوع مصروف: {$typeName}");
+
+        return response()->json(['message' => 'تم حذف نوع المصروف بنجاح']);
     }
 }

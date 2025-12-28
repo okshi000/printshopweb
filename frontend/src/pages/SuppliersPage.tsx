@@ -85,6 +85,9 @@ export default function SuppliersPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
@@ -93,13 +96,27 @@ export default function SuppliersPage() {
   const [viewingSupplier, setViewingSupplier] = useState<Supplier | null>(null);
   const [payingSupplier, setPayingSupplier] = useState<Supplier | null>(null);
 
-  const { data: suppliers, isLoading, error } = useQuery({
-    queryKey: ['suppliers'],
+  // Debounce search
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    const timeoutId = setTimeout(() => {
+      setDebouncedSearch(value);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timeoutId);
+  };
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['suppliers', page, debouncedSearch],
     queryFn: async () => {
-      const res = await suppliersApi.list();
-      return res.data.data || res.data;
+      const params: Record<string, string | number> = { page, per_page: 10 };
+      if (debouncedSearch) params.search = debouncedSearch;
+      const res = await suppliersApi.list(params);
+      return res.data;
     },
   });
+
+  const suppliers = data?.data || [];
 
   const form = useForm<SupplierFormData>({
     resolver: zodResolver(supplierSchema),
@@ -253,12 +270,28 @@ export default function SuppliersPage() {
         )}
       </div>
 
+      {/* Search */}
+      <Card className="shadow-soft">
+        <CardContent className="p-4">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="بحث عن مورد..."
+              value={search}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="w-full pr-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">🔍</span>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Main Content */}
       <Card className="shadow-soft">
         <CardHeader className="border-b border-border/50 pb-4">
           <CardTitle className="text-lg">قائمة الموردين</CardTitle>
           <CardDescription>
-            {suppliers?.length || 0} مورد مسجل
+            {data?.total || 0} مورد مسجل
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -356,16 +389,6 @@ export default function SuppliersPage() {
                                   <Pencil className="h-4 w-4" />
                                 </Button>
                               )}
-                              {hasPermission('create supplier_payments') && balanceDue > 0 && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-green-600 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950"
-                                  onClick={() => handlePayment(supplier)}
-                                >
-                                  <Banknote className="h-4 w-4" />
-                                </Button>
-                              )}
                               {hasPermission('delete suppliers') && (
                                 <Button
                                   variant="ghost"
@@ -384,6 +407,31 @@ export default function SuppliersPage() {
                   </AnimatePresence>
                 </TableBody>
               </Table>
+
+              {/* Pagination */}
+              {data && data.last_page > 1 && (
+                <div className="flex items-center justify-center gap-2 p-4 border-t border-border/50">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                  >
+                    السابق
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    صفحة {data.current_page} من {data.last_page}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.min(data.last_page, p + 1))}
+                    disabled={page === data.last_page}
+                  >
+                    التالي
+                  </Button>
+                </div>
+              )}
 
               {/* Empty State */}
               {suppliers?.length === 0 && (

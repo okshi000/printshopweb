@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\ItemCost;
 use App\Models\InvoicePayment;
+use App\Models\Supplier;
 use App\Models\ActivityLog;
 use App\Models\CashBalance;
 use App\Models\CashMovement;
@@ -47,7 +48,7 @@ class InvoiceController extends Controller
         }
 
         $invoices = $query->orderBy('created_at', 'desc')
-            ->paginate($request->per_page ?? 15);
+            ->paginate($request->per_page ?? 10);
 
         return response()->json($invoices);
     }
@@ -298,6 +299,37 @@ class InvoiceController extends Controller
         ], 201);
     }
 
+    public function statistics(Request $request): JsonResponse
+    {
+        // Get statistics for the last 30 days
+        $days = $request->days ?? 30;
+        $fromDate = now()->subDays($days)->toDateString();
+
+        $stats = Invoice::where('invoice_date', '>=', $fromDate)->get();
+
+        $totalInvoices = $stats->count();
+        $totalSales = (float) $stats->sum('total');
+        $totalCosts = (float) $stats->sum('total_cost');
+        $totalProfits = (float) $stats->sum('profit');
+        
+        // Calculate total paid amount
+        $totalPaid = InvoicePayment::whereHas('invoice', function ($q) use ($fromDate) {
+            $q->where('invoice_date', '>=', $fromDate);
+        })->sum('amount');
+
+        return response()->json([
+            'period_days' => $days,
+            'from_date' => $fromDate,
+            'to_date' => now()->toDateString(),
+            'total_invoices' => $totalInvoices,
+            'total_sales' => round($totalSales, 2),
+            'total_costs' => round($totalCosts, 2),
+            'total_profits' => round($totalProfits, 2),
+            'total_paid' => round($totalPaid, 2),
+            'average_invoice' => $totalInvoices > 0 ? round($totalSales / $totalInvoices, 2) : 0,
+        ]);
+    }
+
     public function destroy(Invoice $invoice): JsonResponse
     {
         // Check if invoice has any payments
@@ -310,12 +342,39 @@ class InvoiceController extends Controller
         $invoiceNumber = $invoice->invoice_number;
 
         DB::transaction(function () use ($invoice) {
+            // Collect all supplier IDs before deletion
+            $supplierIds = $invoice->items()
+                ->with('costs')
+                ->get()
+                ->flatMap(function ($item) {
+                    return $item->costs->map(fn($cost) => $cost->supplier_id);
+                })
+                ->unique()
+                ->filter()
+                ->values();
+
             // Delete related records first
+            // Delete costs one by one to trigger events
+            $invoice->items()->each(function ($item) {
+                $item->costs->each(function ($cost) {
+                    $cost->delete();
+                });
+                $item->delete();
+            });
+
+            // Delete payments
             $invoice->payments()->delete();
-            $invoice->items()->delete();
 
             // Delete the invoice itself
             $invoice->delete();
+
+            // Recalculate supplier balances
+            foreach ($supplierIds as $supplierId) {
+                $supplier = Supplier::find($supplierId);
+                if ($supplier) {
+                    $supplier->recalculateBalance();
+                }
+            }
         });
 
         ActivityLog::log('delete', 'invoices', "حذف الفاتورة: {$invoiceNumber}");

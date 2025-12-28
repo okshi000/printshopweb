@@ -46,18 +46,35 @@ const movementSchema = z.object({
 export default function InventoryPage() {
   const queryClient = useQueryClient()
   const { hasPermission } = useAuth()
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [movementModalOpen, setMovementModalOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null)
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
 
-  const { data: items, isLoading, error } = useQuery({
-    queryKey: ['inventory'],
+  // Debounce search
+  const handleSearchChange = (value: string) => {
+    setSearch(value)
+    const timeoutId = setTimeout(() => {
+      setDebouncedSearch(value)
+      setPage(1)
+    }, 300)
+    return () => clearTimeout(timeoutId)
+  }
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['inventory', page, debouncedSearch],
     queryFn: async () => {
-      const res = await inventoryApi.list()
-      return (res.data.data || res.data) as InventoryItem[]
+      const params: Record<string, string | number> = { page, per_page: 10 }
+      if (debouncedSearch) params.search = debouncedSearch
+      const res = await inventoryApi.list(params)
+      return res.data
     },
   })
+
+  const items = (data?.data || []) as InventoryItem[]
 
   const form = useForm({
     resolver: zodResolver(itemSchema),
@@ -259,6 +276,30 @@ export default function InventoryPage() {
                 </AnimatePresence>
               </TableBody>
             </Table>
+            {/* Pagination */}
+            {data && data.last_page > 1 && (
+              <div className="flex items-center justify-center gap-2 p-4 border-t border-border/50">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                >
+                  السابق
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  صفحة {data.current_page} من {data.last_page}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(p => Math.min(data.last_page, p + 1))}
+                  disabled={page === data.last_page}
+                >
+                  التالي
+                </Button>
+              </div>
+            )}
             {items?.length === 0 && (
               <div className="py-12 text-center text-muted-foreground">لا توجد أصناف في المخزون</div>
             )}

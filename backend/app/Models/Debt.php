@@ -4,13 +4,18 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Debt extends Model
 {
     protected $fillable = [
+        'debt_account_id',
+        'customer_id',
         'debtor_name',
+        'source',
         'amount',
         'remaining_amount',
+        'paid_amount',
         'debt_date',
         'due_date',
         'notes',
@@ -18,27 +23,45 @@ class Debt extends Model
     ];
 
     protected $appends = [
-        'paid_amount',
         'status',
         'description',
+        'source_label',
     ];
+
+    /**
+     * Get the debt account that owns this debt
+     */
+    public function debtAccount(): BelongsTo
+    {
+        return $this->belongsTo(DebtAccount::class);
+    }
+
+    public function customer()
+    {
+        return $this->belongsTo(Customer::class);
+    }
+
+    public function repayments(): HasMany
+    {
+        return $this->hasMany(DebtRepayment::class);
+    }
 
     protected static function booted(): void
     {
         static::created(function (Debt $debt) {
             // When a debt is created, it means we gave money to the debtor
-            // So we need to subtract from cash balance
-            // Note: This assumes debts are money we lent out
-            // If debts are money owed to us, this should be income instead
-            CashBalance::updateBalance('cash', -$debt->amount); // Assuming cash by default
+            // So we need to subtract from the specified source (cash or bank)
+            $source = $debt->source ?? 'cash';
+            CashBalance::updateBalance($source, -$debt->amount);
             
+            $sourceLabel = $source === 'bank' ? 'البنك' : 'الكاش';
             CashMovement::create([
                 'movement_type' => 'expense',
-                'source' => 'cash',
+                'source' => $source,
                 'amount' => $debt->amount,
                 'reference_type' => 'debt_created',
                 'reference_id' => $debt->id,
-                'description' => "إنشاء دين لـ: {$debt->debtor_name}",
+                'description' => "إنشاء دين لـ: {$debt->debtor_name} من {$sourceLabel}",
             ]);
         });
     }
@@ -52,6 +75,7 @@ class Debt extends Model
             'notes' => $notes,
         ]);
 
+        $this->paid_amount += $amount;
         $this->remaining_amount -= $amount;
         if ($this->remaining_amount <= 0) {
             $this->remaining_amount = 0;
@@ -72,19 +96,13 @@ class Debt extends Model
     }
 
     // Accessors for frontend compatibility
-    public function getPaidAmountAttribute(): float
-    {
-        return $this->amount - $this->remaining_amount;
-    }
-
     public function getStatusAttribute(): string
     {
         if ($this->is_paid) {
             return 'paid';
         }
         
-        $paid = $this->amount - $this->remaining_amount;
-        if ($paid > 0) {
+        if ($this->paid_amount > 0) {
             return 'partial';
         }
         
@@ -94,5 +112,13 @@ class Debt extends Model
     public function getDescriptionAttribute(): ?string
     {
         return $this->notes;
+    }
+
+    /**
+     * Get human-readable source label
+     */
+    public function getSourceLabelAttribute(): string
+    {
+        return $this->source === 'bank' ? 'البنك' : 'الكاش';
     }
 }

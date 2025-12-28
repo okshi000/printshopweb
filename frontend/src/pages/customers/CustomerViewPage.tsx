@@ -50,10 +50,11 @@ interface Customer {
   address?: string
   notes?: string
   created_at: string
-  total_invoices: number
-  total_amount: number
-  paid_amount: number
-  remaining_amount: number
+  total_invoices?: number
+  invoices_count?: number
+  total_amount?: number
+  paid_amount?: number
+  remaining_amount?: number
   invoices: Invoice[]
 }
 
@@ -130,7 +131,7 @@ export default function CustomerViewPage() {
             </p>
           </div>
         </div>
-        <Link to={`/customers/${id}/edit`}>
+        <Link to={`/customers?edit=${id}`}>
           <Button variant="outline" className="gap-2">
             <Edit className="h-4 w-4" /> تعديل
           </Button>
@@ -255,28 +256,28 @@ export default function CustomerViewPage() {
                   <FileText className="h-5 w-5 text-blue-600" />
                   <span>عدد الفواتير</span>
                 </div>
-                <span className="text-xl font-bold text-blue-600">{customer.total_invoices}</span>
+                <span className="text-xl font-bold text-blue-600">{customer.total_invoices || customer.invoices_count || 0}</span>
               </div>
               <div className="flex items-center justify-between p-3 bg-gradient-to-l from-emerald-50 to-transparent dark:from-emerald-950 rounded-lg">
                 <div className="flex items-center gap-2">
                   <TrendingUp className="h-5 w-5 text-emerald-600" />
                   <span>إجمالي المبيعات</span>
                 </div>
-                <span className="text-xl font-bold text-emerald-600">{formatCurrency(customer.total_amount)}</span>
+                <span className="text-xl font-bold text-emerald-600">{formatCurrency(parseFloat(String(customer.total_amount || 0)) || 0)}</span>
               </div>
               <div className="flex items-center justify-between p-3 bg-gradient-to-l from-green-50 to-transparent dark:from-green-950 rounded-lg">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-green-600" />
                   <span>المدفوع</span>
                 </div>
-                <span className="text-xl font-bold text-green-600">{formatCurrency(customer.paid_amount)}</span>
+                <span className="text-xl font-bold text-green-600">{formatCurrency(parseFloat(String(customer.paid_amount || 0)) || 0)}</span>
               </div>
               <div className="flex items-center justify-between p-3 bg-gradient-to-l from-red-50 to-transparent dark:from-red-950 rounded-lg">
                 <div className="flex items-center gap-2">
                   <Clock className="h-5 w-5 text-red-600" />
                   <span>المستحقات</span>
                 </div>
-                <span className="text-xl font-bold text-red-600">{formatCurrency(customer.remaining_amount)}</span>
+                <span className="text-xl font-bold text-red-600">{formatCurrency(parseFloat(String(customer.remaining_amount || 0)) || 0)}</span>
               </div>
             </CardContent>
           </Card>

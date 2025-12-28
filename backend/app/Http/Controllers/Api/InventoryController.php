@@ -28,7 +28,7 @@ class InventoryController extends Controller
         }
 
         $items = $query->orderBy('name')
-            ->paginate($request->per_page ?? 15);
+            ->paginate($request->per_page ?? 10);
 
         return response()->json($items);
     }

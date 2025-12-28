@@ -27,7 +27,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
-import { cn, formatCurrency, fadeInUp, staggerContainer } from '@/lib/utils'
+import { cn, formatCurrency, fadeInUp, staggerContainer, getPaymentStatus, getPaymentStatusColor, getPaymentStatusLabel } from '@/lib/utils'
 import { invoicesApi } from '../api'
 
 // Helper function to safely format dates
@@ -47,8 +47,11 @@ interface InvoiceItem {
   product_name: string
   quantity: number
   unit_price: number
-  total: number
+  total_price: number
+  total_cost: number
+  profit: number
   notes?: string
+  description?: string
   costs?: { id: number; supplier_name?: string; cost_type: string; amount: number }[]
 }
 
@@ -174,7 +177,7 @@ export default function ViewInvoicePage() {
   }
 
   const status = statusMap[invoice.status] || statusMap.pending
-  const totalCosts = invoice.items.reduce((sum, item) => sum + (item.costs?.reduce((cs, c) => cs + c.amount, 0) || 0), 0)
+  const totalCosts = invoice.items.reduce((sum, item) => sum + (parseFloat(String(item.total_cost || 0)) || 0), 0)
 
   return (
     <motion.div variants={staggerContainer} initial="initial" animate="animate" className="space-y-6">
@@ -302,8 +305,8 @@ export default function ViewInvoicePage() {
                           </div>
                         </TableCell>
                         <TableCell className="text-center">{item.quantity}</TableCell>
-                        <TableCell className="text-left">{formatCurrency(item.unit_price)}</TableCell>
-                        <TableCell className="text-left font-medium">{formatCurrency(item.total)}</TableCell>
+                        <TableCell className="text-left">{formatCurrency(parseFloat(String(item.unit_price)))}</TableCell>
+                        <TableCell className="text-left font-medium">{formatCurrency(parseFloat(String(item.total_price || 0)))}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -366,9 +369,15 @@ export default function ViewInvoicePage() {
               <CardTitle className="text-lg">ملخص الفاتورة</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">المجموع:</span>
                 <span className="font-medium">{formatCurrency(invoice.total_amount)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">حالة الدفع:</span>
+                <Badge className={cn("gap-1", getPaymentStatusColor(getPaymentStatus(invoice.total_amount, invoice.paid_amount)))}>
+                  {getPaymentStatusLabel(getPaymentStatus(invoice.total_amount, invoice.paid_amount))}
+                </Badge>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">التكاليف:</span>
@@ -449,7 +458,6 @@ export default function ViewInvoicePage() {
               <Select value={paymentType} onValueChange={setPaymentType}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="deposit">عربون</SelectItem>
                   <SelectItem value="partial">دفعة جزئية</SelectItem>
                   <SelectItem value="full">دفعة كاملة</SelectItem>
                 </SelectContent>

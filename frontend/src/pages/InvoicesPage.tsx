@@ -48,39 +48,64 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { Pagination } from '@/components/ui/pagination';
 import { invoicesApi } from '../api';
-import type { Invoice } from '../types';
+import type { Invoice, PaginatedResponse } from '../types';
 import { useAuth } from '../contexts/AuthContext';
-import { cn, formatCurrency, formatDate, getStatusColor, getStatusLabel } from '@/lib/utils';
+import { cn, formatCurrency, formatDate, getStatusColor, getStatusLabel, getPaymentStatus, getPaymentStatusColor, getPaymentStatusLabel } from '@/lib/utils';
 
 export default function InvoicesPage() {
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
-  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [page, setPage] = useState(1);
+  const [invoiceStatusFilter, setInvoiceStatusFilter] = useState<string>('');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
 
-  const { data: invoices, isLoading, error } = useQuery({
-    queryKey: ['invoices', statusFilter, dateFrom, dateTo],
+  // Debounce search
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    const timeoutId = setTimeout(() => {
+      setDebouncedSearch(value);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timeoutId);
+  };
+
+  const { data, isLoading, error } = useQuery<PaginatedResponse<Invoice>>({
+    queryKey: ['invoices', page, invoiceStatusFilter, debouncedSearch, dateFrom, dateTo],
     queryFn: async () => {
-      const params: Record<string, string> = {};
-      if (statusFilter) params.status = statusFilter;
+      const params: Record<string, string | number> = { page, per_page: 10 };
+      if (invoiceStatusFilter) params.status = invoiceStatusFilter;
+      if (debouncedSearch) params.search = debouncedSearch;
       if (dateFrom) params.date_from = dateFrom.toISOString().split('T')[0];
       if (dateTo) params.date_to = dateTo.toISOString().split('T')[0];
       const res = await invoicesApi.list(params);
-      return res.data.data || res.data;
+      return res.data;
     },
   });
 
-  const filteredInvoices = invoices?.filter((inv: Invoice) => {
-    if (!searchTerm) return true;
-    const search = searchTerm.toLowerCase();
-    return (
-      inv.invoice_number?.toLowerCase().includes(search) ||
-      inv.customer?.name?.toLowerCase().includes(search)
-    );
+  const { data: statistics, isLoading: statsLoading } = useQuery({
+    queryKey: ['invoices-statistics'],
+    queryFn: async () => {
+      const res = await invoicesApi.statistics({ days: 30 });
+      return res.data;
+    },
   });
+
+  // Client-side filter for payment status only (since backend doesn't support it)
+  const filteredInvoices = data?.data?.filter((inv: Invoice) => {
+    if (paymentStatusFilter) {
+      const total = parseFloat(String(inv.total || 0));
+      const paid = parseFloat(String(inv.paid_amount || 0));
+      const paymentStatus = getPaymentStatus(total, paid);
+      if (paymentStatus !== paymentStatusFilter) return false;
+    }
+    return true;
+  }) || [];
 
   const rowVariants = {
     hidden: { opacity: 0, x: -20 },
@@ -88,13 +113,16 @@ export default function InvoicesPage() {
   };
 
   const clearFilters = () => {
-    setStatusFilter('');
+    setInvoiceStatusFilter('');
+    setPaymentStatusFilter('');
     setSearchTerm('');
+    setDebouncedSearch('');
     setDateFrom(undefined);
     setDateTo(undefined);
+    setPage(1);
   };
 
-  const hasActiveFilters = statusFilter || dateFrom || dateTo || searchTerm;
+  const hasActiveFilters = invoiceStatusFilter || paymentStatusFilter || dateFrom || dateTo || searchTerm;
 
   if (error) {
     return (
@@ -137,6 +165,89 @@ export default function InvoicesPage() {
         )}
       </div>
 
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="shadow-soft overflow-hidden border-0 bg-gradient-to-br from-blue-50 to-blue-50/50 dark:from-blue-950/20 dark:to-blue-950/40">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-1">فاتورة (آخر 30 يوم)</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {statsLoading ? (
+                    <Skeleton className="h-8 w-12" />
+                  ) : (
+                    statistics?.total_invoices || 0
+                  )}
+                </p>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                <FileText className="h-6 w-6 text-blue-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-soft overflow-hidden border-0 bg-gradient-to-br from-green-50 to-green-50/50 dark:from-green-950/20 dark:to-green-950/40">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-1">إجمالي المبيعات</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {statsLoading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    formatCurrency(statistics?.total_sales || 0)
+                  )}
+                </p>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-green-500/20 flex items-center justify-center">
+                <Receipt className="h-6 w-6 text-green-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-soft overflow-hidden border-0 bg-gradient-to-br from-purple-50 to-purple-50/50 dark:from-purple-950/20 dark:to-purple-950/40">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-1">إجمالي الأرباح</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {statsLoading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    formatCurrency(statistics?.total_profits || 0)
+                  )}
+                </p>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                <Banknote className="h-6 w-6 text-purple-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-soft overflow-hidden border-0 bg-gradient-to-br from-amber-50 to-amber-50/50 dark:from-amber-950/20 dark:to-amber-950/40">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-1">المتوسط لكل فاتورة</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {statsLoading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    formatCurrency(statistics?.average_invoice || 0)
+                  )}
+                </p>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                <FileText className="h-6 w-6 text-amber-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Filters */}
       <Card className="shadow-soft">
         <CardContent className="p-4">
@@ -146,23 +257,37 @@ export default function InvoicesPage() {
               <Input
                 placeholder="بحث برقم الفاتورة أو اسم العميل..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 className="pr-10"
               />
             </div>
             
             <div className="flex flex-wrap gap-2">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={invoiceStatusFilter} onValueChange={(value) => { setInvoiceStatusFilter(value); setPage(1); }}>
                 <SelectTrigger className="w-[150px]">
                   <Filter className="h-4 w-4 ml-2" />
-                  <SelectValue placeholder="الحالة" />
+                  <SelectValue placeholder="حالة الفاتورة" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="draft">مسودة</SelectItem>
-                  <SelectItem value="pending">معلقة</SelectItem>
+                  <SelectItem value="new">جديدة</SelectItem>
+                  <SelectItem value="pending">قيد الانتظار</SelectItem>
+                  <SelectItem value="in_progress">قيد التنفيذ</SelectItem>
+                  <SelectItem value="ready">جاهزة</SelectItem>
+                  <SelectItem value="delivered">تم التسليم</SelectItem>
+                  <SelectItem value="completed">مكتملة</SelectItem>
+                  <SelectItem value="cancelled">ملغية</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={paymentStatusFilter} onValueChange={(value) => { setPaymentStatusFilter(value); setPage(1); }}>
+                <SelectTrigger className="w-[150px]">
+                  <Banknote className="h-4 w-4 ml-2" />
+                  <SelectValue placeholder="حالة الدفع" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unpaid">غير مدفوعة</SelectItem>
                   <SelectItem value="partial">مدفوعة جزئياً</SelectItem>
                   <SelectItem value="paid">مدفوعة</SelectItem>
-                  <SelectItem value="cancelled">ملغية</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -215,7 +340,7 @@ export default function InvoicesPage() {
         <CardHeader className="border-b border-border/50 pb-4">
           <CardTitle className="text-lg">قائمة الفواتير</CardTitle>
           <CardDescription>
-            {filteredInvoices?.length || 0} فاتورة
+            {data?.total || 0} فاتورة
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -243,7 +368,8 @@ export default function InvoicesPage() {
                     <TableHead className="font-semibold">الإجمالي</TableHead>
                     <TableHead className="font-semibold">المدفوع</TableHead>
                     <TableHead className="font-semibold">المتبقي</TableHead>
-                    <TableHead className="font-semibold">الحالة</TableHead>
+                    <TableHead className="font-semibold">حالة الفاتورة</TableHead>
+                    <TableHead className="font-semibold">حالة الدفع</TableHead>
                     <TableHead className="font-semibold text-center">الإجراءات</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -307,6 +433,11 @@ export default function InvoicesPage() {
                             </Badge>
                           </TableCell>
                           <TableCell>
+                            <Badge className={cn("gap-1", getPaymentStatusColor(getPaymentStatus(total, paid)))}>
+                              {getPaymentStatusLabel(getPaymentStatus(total, paid))}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
                             <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               <Button
                                 variant="ghost"
@@ -352,6 +483,17 @@ export default function InvoicesPage() {
                   </AnimatePresence>
                 </TableBody>
               </Table>
+
+              {/* Pagination */}
+              {data && data.last_page > 1 && (
+                <Pagination
+                  currentPage={data.current_page}
+                  totalPages={data.last_page}
+                  totalItems={data.total}
+                  perPage={data.per_page}
+                  onPageChange={setPage}
+                />
+              )}
 
               {/* Empty State */}
               {filteredInvoices?.length === 0 && (

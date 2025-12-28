@@ -34,7 +34,17 @@ class ActivityLogController extends Controller
         }
 
         $logs = $query->orderBy('created_at', 'desc')
-            ->paginate($request->per_page ?? 20);
+            ->paginate($request->per_page ?? 10);
+
+        // Transform the data to include user_name and entity_name
+        $logs->getCollection()->transform(function ($log) {
+            $log->user_name = $log->user ? $log->user->name : 'غير معروف';
+            $log->action = $log->action_type;
+            $log->entity_type = $log->module;
+            $log->entity_id = $log->record_id;
+            $log->entity_name = null; // Can be enhanced based on module type
+            return $log;
+        });
 
         return response()->json($logs);
     }

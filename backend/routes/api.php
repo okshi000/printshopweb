@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\WithdrawalController;
 use App\Http\Controllers\Api\CashController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\DebtController;
+use App\Http\Controllers\Api\DebtAccountController;
 use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\AccountantController;
@@ -51,11 +52,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('invoices', InvoiceController::class);
     Route::patch('/invoices/{invoice}/status', [InvoiceController::class, 'updateStatus']);
     Route::post('/invoices/{invoice}/payments', [InvoiceController::class, 'addPayment']);
+    Route::get('/invoices-statistics', [InvoiceController::class, 'statistics']);
 
     // Expenses
     Route::apiResource('expenses', ExpenseController::class)->except(['update']);
     Route::get('/expense-types', [ExpenseController::class, 'types']);
     Route::post('/expense-types', [ExpenseController::class, 'storeType']);
+    Route::put('/expense-types/{expenseType}', [ExpenseController::class, 'updateType']);
+    Route::delete('/expense-types/{expenseType}', [ExpenseController::class, 'destroyType']);
 
     // Withdrawals
     Route::apiResource('withdrawals', WithdrawalController::class)->except(['update']);
@@ -77,6 +81,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Debts
     Route::apiResource('debts', DebtController::class)->except(['update']);
     Route::post('/debts/{debt}/repay', [DebtController::class, 'repay']);
+
+    // Debt Accounts
+    Route::apiResource('debt-accounts', DebtAccountController::class);
+    Route::get('/debt-accounts-all', [DebtAccountController::class, 'all']);
 
     // Activity Log
     Route::get('/activity-logs', [ActivityLogController::class, 'index']);
@@ -108,41 +116,125 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/roles/{role}', [UserController::class, 'deleteRole']);
     Route::get('/permissions', [UserController::class, 'permissions']);
 
-    // Advanced Reports - التقارير التفصيلية
+    // Reports - التقارير الجديدة
+    Route::prefix('reports')->group(function () {
+        // Sales Reports - تقارير المبيعات
+        Route::prefix('sales')->group(function () {
+            Route::get('/summary', [\App\Http\Controllers\Reports\SalesReportController::class, 'summary']);
+            Route::get('/by-customer', [\App\Http\Controllers\Reports\SalesReportController::class, 'byCustomer']);
+            Route::get('/by-product', [\App\Http\Controllers\Reports\SalesReportController::class, 'byProduct']);
+            Route::get('/by-period', [\App\Http\Controllers\Reports\SalesReportController::class, 'trend']);
+            Route::get('/top-products', [\App\Http\Controllers\Reports\SalesReportController::class, 'topProducts']);
+            Route::get('/invoices', [\App\Http\Controllers\Reports\SalesReportController::class, 'trend']);
+            Route::get('/export/{type}', [\App\Http\Controllers\Reports\SalesReportController::class, 'export']);
+        });
+        
+        // Inventory Reports - تقارير المخزون
+        Route::prefix('inventory')->group(function () {
+            Route::get('/summary', [\App\Http\Controllers\Reports\InventoryReportController::class, 'summary']);
+            Route::get('/details', [\App\Http\Controllers\Reports\InventoryReportController::class, 'details']);
+            Route::get('/movements', [\App\Http\Controllers\Reports\InventoryReportController::class, 'movements']);
+            Route::get('/movements/summary', [\App\Http\Controllers\Reports\InventoryReportController::class, 'movementSummary']);
+            Route::get('/valuation', [\App\Http\Controllers\Reports\InventoryReportController::class, 'valuation']);
+            Route::get('/low-stock', [\App\Http\Controllers\Reports\InventoryReportController::class, 'lowStock']);
+            Route::get('/export/{type}', [\App\Http\Controllers\Reports\InventoryReportController::class, 'export']);
+        });
+        
+        // Customer Reports - تقارير العملاء
+        Route::prefix('customers')->group(function () {
+            Route::get('/summary', [\App\Http\Controllers\Reports\CustomerReportController::class, 'summary']);
+            Route::get('/report', [\App\Http\Controllers\Reports\CustomerReportController::class, 'report']);
+            Route::get('/export/{type}', [\App\Http\Controllers\Reports\CustomerReportController::class, 'export']);
+        });
+
+        // Debt Reports - تقارير الديون
+        Route::prefix('debts')->group(function () {
+            Route::get('/summary', [\App\Http\Controllers\Reports\CustomerReportController::class, 'debtSummary']);
+            Route::get('/by-customer', [\App\Http\Controllers\Reports\CustomerReportController::class, 'debtByCustomer']);
+            Route::get('/aging', [\App\Http\Controllers\Reports\CustomerReportController::class, 'debtAging']);
+            Route::get('/repayment-history', [\App\Http\Controllers\Reports\CustomerReportController::class, 'repaymentHistory']);
+        });
+        
+        // Cash Flow Reports - تقارير التدفق النقدي
+        Route::prefix('cash-flow')->group(function () {
+            Route::get('/summary', [\App\Http\Controllers\Reports\CashflowReportController::class, 'summary']);
+            Route::get('/trend', [\App\Http\Controllers\Reports\CashflowReportController::class, 'trend']);
+            Route::get('/by-category', [\App\Http\Controllers\Reports\CashflowReportController::class, 'byCategory']);
+            Route::get('/movements', [\App\Http\Controllers\Reports\CashflowReportController::class, 'movements']);
+            Route::get('/balance-by-source', [\App\Http\Controllers\Reports\CashflowReportController::class, 'balanceBySource']);
+            Route::get('/daily-summary', [\App\Http\Controllers\Reports\CashflowReportController::class, 'dailySummary']);
+            Route::get('/forecast', [\App\Http\Controllers\Reports\CashflowReportController::class, 'forecast']);
+            Route::get('/export/{type}', [\App\Http\Controllers\Reports\CashflowReportController::class, 'export']);
+        });
+    });
+
+    // Advanced Reports - التقارير التفصيلية (الإصدار الجديد)
     Route::prefix('reports-v2')->group(function () {
-        // Financial Reports
-        Route::get('/financial/summary', [ReportsController::class, 'financialSummary']);
-        Route::get('/financial/revenue-by-period', [ReportsController::class, 'revenueByPeriod']);
-        Route::get('/financial/expense-breakdown', [ReportsController::class, 'expenseBreakdown']);
-        Route::get('/financial/profit-loss', [ReportsController::class, 'profitLossReport']);
+        // Financial Reports - التقارير المالية
+        Route::prefix('financial')->group(function () {
+            Route::get('/summary', [\App\Http\Controllers\Reports\FinancialReportController::class, 'summary']);
+            Route::get('/revenue-by-period', [\App\Http\Controllers\Reports\FinancialReportController::class, 'revenueByPeriod']);
+            Route::get('/expense-breakdown', [\App\Http\Controllers\Reports\FinancialReportController::class, 'expenseBreakdown']);
+            Route::get('/profit-loss', [\App\Http\Controllers\Reports\FinancialReportController::class, 'profitLoss']);
+            Route::get('/profit-trend', [\App\Http\Controllers\Reports\FinancialReportController::class, 'profitTrend']);
+            Route::get('/export/{type}/{format}', [\App\Http\Controllers\Reports\FinancialReportController::class, 'export']);
+        });
         
-        // Sales Reports
-        Route::get('/sales/summary', [ReportsController::class, 'salesReport']);
-        Route::get('/sales/by-customer', [ReportsController::class, 'salesByCustomer']);
-        Route::get('/sales/by-product', [ReportsController::class, 'salesByProduct']);
-        Route::get('/sales/top-products', [ReportsController::class, 'topSellingProducts']);
+        // Sales Reports - تقارير المبيعات
+        Route::prefix('sales')->group(function () {
+            Route::get('/summary', [\App\Http\Controllers\Reports\SalesReportController::class, 'summary']);
+            Route::get('/by-customer', [\App\Http\Controllers\Reports\SalesReportController::class, 'byCustomer']);
+            Route::get('/by-product', [\App\Http\Controllers\Reports\SalesReportController::class, 'byProduct']);
+            Route::get('/top-products', [\App\Http\Controllers\Reports\SalesReportController::class, 'topProducts']);
+            Route::get('/trend', [\App\Http\Controllers\Reports\SalesReportController::class, 'trend']);
+            Route::get('/quick-stats', [\App\Http\Controllers\Reports\SalesReportController::class, 'quickStats']);
+            Route::get('/export/{type}/{format}', [\App\Http\Controllers\Reports\SalesReportController::class, 'export']);
+        });
         
-        // Inventory Reports
-        Route::get('/inventory/summary', [ReportsController::class, 'inventoryReport']);
-        Route::get('/inventory/details', [ReportsController::class, 'inventoryItemDetails']);
-        Route::get('/inventory/movements', [ReportsController::class, 'inventoryMovementReport']);
-        Route::get('/inventory/valuation', [ReportsController::class, 'stockValuation']);
+        // Inventory Reports - تقارير المخزون
+        Route::prefix('inventory')->group(function () {
+            Route::get('/summary', [\App\Http\Controllers\Reports\InventoryReportController::class, 'summary']);
+            Route::get('/details', [\App\Http\Controllers\Reports\InventoryReportController::class, 'details']);
+            Route::get('/movements', [\App\Http\Controllers\Reports\InventoryReportController::class, 'movements']);
+            Route::get('/valuation', [\App\Http\Controllers\Reports\InventoryReportController::class, 'valuation']);
+            Route::get('/low-stock', [\App\Http\Controllers\Reports\InventoryReportController::class, 'lowStock']);
+            Route::get('/movement-summary', [\App\Http\Controllers\Reports\InventoryReportController::class, 'movementSummary']);
+            Route::get('/export/{type}/{format}', [\App\Http\Controllers\Reports\InventoryReportController::class, 'export']);
+        });
         
-        // Supplier Reports
-        Route::get('/suppliers/summary', [ReportsController::class, 'supplierReport']);
+        // Customer Reports - تقارير العملاء
+        Route::prefix('customers')->group(function () {
+            Route::get('/summary', [\App\Http\Controllers\Reports\CustomerReportController::class, 'summary']);
+            Route::get('/report', [\App\Http\Controllers\Reports\CustomerReportController::class, 'report']);
+            Route::get('/export/{type}/{format}', [\App\Http\Controllers\Reports\CustomerReportController::class, 'export']);
+        });
+
+        // Debt Reports - تقارير الديون
+        Route::prefix('debts')->group(function () {
+            Route::get('/summary', [\App\Http\Controllers\Reports\CustomerReportController::class, 'debtSummary']);
+            Route::get('/by-customer', [\App\Http\Controllers\Reports\CustomerReportController::class, 'debtByCustomer']);
+            Route::get('/aging', [\App\Http\Controllers\Reports\CustomerReportController::class, 'debtAging']);
+            Route::get('/repayment-history', [\App\Http\Controllers\Reports\CustomerReportController::class, 'repaymentHistory']);
+        });
         
-        // Customer Reports
-        Route::get('/customers/summary', [ReportsController::class, 'customerReport']);
+        // Cash Flow Reports - تقارير التدفق النقدي
+        Route::prefix('cashflow')->group(function () {
+            Route::get('/summary', [\App\Http\Controllers\Reports\CashflowReportController::class, 'summary']);
+            Route::get('/trend', [\App\Http\Controllers\Reports\CashflowReportController::class, 'trend']);
+            Route::get('/by-category', [\App\Http\Controllers\Reports\CashflowReportController::class, 'byCategory']);
+            Route::get('/movements', [\App\Http\Controllers\Reports\CashflowReportController::class, 'movements']);
+            Route::get('/balance-by-source', [\App\Http\Controllers\Reports\CashflowReportController::class, 'balanceBySource']);
+            Route::get('/daily-summary', [\App\Http\Controllers\Reports\CashflowReportController::class, 'dailySummary']);
+            Route::get('/forecast', [\App\Http\Controllers\Reports\CashflowReportController::class, 'forecast']);
+            Route::get('/export/{type}/{format}', [\App\Http\Controllers\Reports\CashflowReportController::class, 'export']);
+        });
         
-        // Debt Reports
-        Route::get('/debts/summary', [ReportsController::class, 'debtReport']);
-        Route::get('/debts/by-customer', [ReportsController::class, 'debtByCustomer']);
-        
-        // Cash Flow Reports
-        Route::get('/cash-flow/summary', [ReportsController::class, 'cashFlowReport']);
-        Route::get('/cash-flow/trend', [ReportsController::class, 'cashFlowTrend']);
-        
-        // Dashboard Metrics
-        Route::get('/dashboard/metrics', [ReportsController::class, 'dashboardMetrics']);
+        // Legacy routes for backward compatibility (سيتم إزالتها لاحقاً)
+        Route::get('/financial/summary', [\App\Http\Controllers\Reports\FinancialReportController::class, 'summary']);
+        Route::get('/sales/summary', [\App\Http\Controllers\Reports\SalesReportController::class, 'summary']);
+        Route::get('/inventory/summary', [\App\Http\Controllers\Reports\InventoryReportController::class, 'summary']);
+        Route::get('/cash-flow/summary', [\App\Http\Controllers\Reports\CashflowReportController::class, 'summary']);
+        Route::get('/cash-flow/trend', [\App\Http\Controllers\Reports\CashflowReportController::class, 'trend']);
+        Route::get('/dashboard/metrics', [\App\Http\Controllers\Reports\FinancialReportController::class, 'summary']);
     });
 });

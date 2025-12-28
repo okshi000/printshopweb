@@ -22,8 +22,6 @@ import {
   Printer,
   Menu,
   X,
-  Bell,
-  Search,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -361,30 +359,9 @@ export default function MainLayout() {
             >
               <Menu className="h-5 w-5" />
             </Button>
-
-            {/* Search (Desktop) */}
-            <div className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border w-64 lg:w-80">
-              <Search className="h-4 w-4 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="بحث..."
-                className="bg-transparent border-none outline-none text-sm flex-1"
-              />
-              <kbd className="hidden lg:inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-muted-foreground bg-background border border-border">
-                ⌘K
-              </kbd>
-            </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Notifications */}
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5" />
-              <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-destructive text-[10px] font-medium text-white flex items-center justify-center">
-                3
-              </span>
-            </Button>
-
             {/* Theme Toggle */}
             <ThemeToggle />
 
