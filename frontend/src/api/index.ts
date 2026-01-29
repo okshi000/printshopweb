@@ -188,6 +188,8 @@ export const accountantApi = {
   getExpenseChart: (params?: Record<string, unknown>) => api.get('/accountant/expense-chart', { params }),
   getIncomeStatement: (params?: Record<string, unknown>) => api.get('/accountant/income-statement', { params }),
   getBalanceSheet: (params?: Record<string, unknown>) => api.get('/accountant/balance-sheet', { params }),
+  getAnalytics: (params?: Record<string, unknown>) => api.get('/accountant/analytics', { params }),
+  getFinancialHealth: (params?: Record<string, unknown>) => api.get('/accountant/health', { params }),
 };
 
 // تصدير APIs التقارير

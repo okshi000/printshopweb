@@ -107,6 +107,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/accountant/expense-chart', [AccountantController::class, 'expenseChart']);
     Route::get('/accountant/income-statement', [AccountantController::class, 'incomeStatement']);
     Route::get('/accountant/balance-sheet', [AccountantController::class, 'balanceSheet']);
+    Route::get('/accountant/analytics', [AccountantController::class, 'analyticsReport']);
+    Route::get('/accountant/health', [AccountantController::class, 'financialHealth']);
 
     // Users Management - إدارة المستخدمين
     Route::apiResource('users', UserController::class);
@@ -118,6 +120,15 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Reports - التقارير الجديدة
     Route::prefix('reports')->group(function () {
+        // Financial Reports - تقارير مالية (توافق مع واجهة الفرونتэнд)
+        Route::prefix('financial')->group(function () {
+            Route::get('/summary', [\App\Http\Controllers\Reports\FinancialReportController::class, 'summary']);
+            Route::get('/revenue', [\App\Http\Controllers\Reports\FinancialReportController::class, 'revenueByPeriod']);
+            Route::get('/expenses', [\App\Http\Controllers\Reports\FinancialReportController::class, 'expenseBreakdown']);
+            Route::get('/profit-loss', [\App\Http\Controllers\Reports\FinancialReportController::class, 'profitLoss']);
+            Route::get('/income-statement', [\App\Http\Controllers\Reports\FinancialReportController::class, 'incomeStatement']);
+            Route::get('/balance-sheet', [\App\Http\Controllers\Reports\FinancialReportController::class, 'balanceSheet']);
+        });
         // Sales Reports - تقارير المبيعات
         Route::prefix('sales')->group(function () {
             Route::get('/summary', [\App\Http\Controllers\Reports\SalesReportController::class, 'summary']);

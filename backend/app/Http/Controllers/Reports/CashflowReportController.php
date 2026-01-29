@@ -78,13 +78,13 @@ class CashflowReportController extends Controller
 
         $format = $this->getDateFormat($period);
 
-        $data = CashMovement::selectRaw("
-                DATE_FORMAT(movement_date, '$format') as period,
-                SUM(CASE WHEN movement_type IN ('income', 'initial') THEN amount ELSE 0 END) as inflows,
-                SUM(CASE WHEN movement_type IN ('expense', 'withdrawal') THEN amount ELSE 0 END) as outflows,
-                COUNT(CASE WHEN movement_type IN ('income', 'initial') THEN 1 END) as inflow_count,
-                COUNT(CASE WHEN movement_type IN ('expense', 'withdrawal') THEN 1 END) as outflow_count
-            ")
+        $data = CashMovement::selectRaw(
+            $this->dateFormatExpr('movement_date', $period) . " as period,\n" .
+            "SUM(CASE WHEN movement_type IN ('income', 'initial') THEN amount ELSE 0 END) as inflows,\n" .
+            "SUM(CASE WHEN movement_type IN ('expense', 'withdrawal') THEN amount ELSE 0 END) as outflows,\n" .
+            "COUNT(CASE WHEN movement_type IN ('income', 'initial') THEN 1 END) as inflow_count,\n" .
+            "COUNT(CASE WHEN movement_type IN ('expense', 'withdrawal') THEN 1 END) as outflow_count"
+            )
             ->whereBetween('movement_date', [$startDate, $endDate])
             ->groupBy('period')
             ->orderBy('period')
@@ -338,5 +338,21 @@ class CashflowReportController extends Controller
             'yearly' => '%Y',
             default => '%Y-%m'
         };
+    }
+
+    private function dateFormatExpr(string $column, string $period): string
+    {
+        $driver = DB::getDriverName();
+        if ($driver === 'sqlite') {
+            return "strftime('" . match($period) {
+                'daily' => '%Y-%m-%d',
+                'weekly' => '%Y-%W',
+                'monthly' => '%Y-%m',
+                'quarterly' => '%Y-%m',
+                'yearly' => '%Y',
+                default => '%Y-%m'
+            } . "', $column)";
+        }
+        return "DATE_FORMAT($column, '" . $this->getDateFormat($period) . "')";
     }
 }

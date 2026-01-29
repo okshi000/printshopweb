@@ -90,21 +90,18 @@ class FinancialReportController extends Controller
 
         $format = $this->getDateFormat($period);
 
-        $revenues = Invoice::selectRaw(
-                "strftime('" . $this->getSQLiteDateFormat($period) . "', invoice_date) as period,
-                SUM(total) as revenue,
-                COUNT(*) as invoice_count"
-            )
+            $revenues = Invoice::selectRaw(
+                    $this->dateFormatExpr('invoice_date', $period) . " as period,\n                SUM(total) as revenue,\n                COUNT(*) as invoice_count"
+                )
             ->whereBetween('invoice_date', [$startDate, $endDate])
             ->groupBy('period')
             ->orderBy('period')
             ->get()
             ->keyBy('period');
 
-        $expenses = Expense::selectRaw(
-                "strftime('" . $this->getSQLiteDateFormat($period) . "', expense_date) as period,
-                SUM(amount) as expenses"
-            )
+            $expenses = Expense::selectRaw(
+                    $this->dateFormatExpr('expense_date', $period) . " as period,\n                SUM(amount) as expenses"
+                )
             ->whereBetween('expense_date', [$startDate, $endDate])
             ->groupBy('period')
             ->get()
@@ -338,19 +335,19 @@ class FinancialReportController extends Controller
 
         $format = $this->getDateFormat($period);
 
-        $revenues = Invoice::selectRaw(
-                "DATE_FORMAT(invoice_date, '" . $format . "') as period,
-                SUM(total) as revenue"
-            )
+            $revenues = Invoice::selectRaw(
+                    $this->dateFormatExpr('invoice_date', $period) . " as period,
+                    SUM(total) as revenue"
+                )
             ->whereBetween('invoice_date', [$startDate, $endDate])
             ->groupBy('period')
             ->get()
             ->keyBy('period');
 
-        $expenses = Expense::selectRaw(
-                "strftime('" . $this->getSQLiteDateFormat($period) . "', expense_date) as period,
-                SUM(amount) as expenses"
-            )
+            $expenses = Expense::selectRaw(
+                    $this->dateFormatExpr('expense_date', $period) . " as period,
+                    SUM(amount) as expenses"
+                )
             ->whereBetween('expense_date', [$startDate, $endDate])
             ->groupBy('period')
             ->get()
@@ -413,5 +410,18 @@ class FinancialReportController extends Controller
             'yearly' => '%Y',
             default => '%Y-%m'
         };
+    }
+
+    /**
+     * Build a DB-driver aware date format expression for grouping.
+     */
+    private function dateFormatExpr(string $column, string $period): string
+    {
+        $driver = DB::getDriverName();
+        if ($driver === 'sqlite') {
+            return "strftime('" . $this->getSQLiteDateFormat($period) . "', $column)";
+        }
+        // Default to MySQL/MariaDB DATE_FORMAT
+        return "DATE_FORMAT($column, '" . $this->getDateFormat($period) . "')";
     }
 }

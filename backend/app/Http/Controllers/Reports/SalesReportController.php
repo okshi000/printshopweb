@@ -191,13 +191,13 @@ class SalesReportController extends Controller
 
         $format = $this->getDateFormat($period);
 
-        $data = Invoice::selectRaw("
-                DATE_FORMAT(invoice_date, '$format') as period,
-                SUM(total) as sales,
-                COUNT(*) as invoice_count,
-                COUNT(DISTINCT customer_id) as customer_count,
-                AVG(total) as average_sale
-            ")
+        $data = Invoice::selectRaw(
+            $this->dateFormatExpr('invoice_date', $period) . " as period,\n" .
+            "SUM(total) as sales,\n" .
+            "COUNT(*) as invoice_count,\n" .
+            "COUNT(DISTINCT customer_id) as customer_count,\n" .
+            "AVG(total) as average_sale"
+            )
             ->whereBetween('invoice_date', [$startDate, $endDate])
             ->groupBy('period')
             ->orderBy('period')
@@ -260,5 +260,21 @@ class SalesReportController extends Controller
             'yearly' => '%Y',
             default => '%Y-%m'
         };
+    }
+
+    private function dateFormatExpr(string $column, string $period): string
+    {
+        $driver = DB::getDriverName();
+        if ($driver === 'sqlite') {
+            return "strftime('" . match($period) {
+                'daily' => '%Y-%m-%d',
+                'weekly' => '%Y-%W',
+                'monthly' => '%Y-%m',
+                'quarterly' => '%Y-%m',
+                'yearly' => '%Y',
+                default => '%Y-%m'
+            } . "', $column)";
+        }
+        return "DATE_FORMAT($column, '" . $this->getDateFormat($period) . "')";
     }
 }

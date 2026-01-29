@@ -250,12 +250,12 @@ class ReportsController extends Controller
         return response()->json([
             'total_items' => $items->count(),
             'total_value' => $items->sum(function ($item) {
-                return $item->quantity * $item->unit_cost;
+                return ($item->current_quantity ?? 0) * ($item->unit_cost ?? 0);
             }),
-            'low_stock_items' => $items->where('quantity', '<=', $lowStockThreshold)->count(),
-            'out_of_stock_items' => $items->where('quantity', 0)->count(),
+            'low_stock_items' => $items->filter(function ($i) use ($lowStockThreshold) { return ($i->current_quantity ?? 0) > 0 && ($i->current_quantity ?? 0) <= ($i->minimum_quantity ?? $lowStockThreshold); })->count(),
+            'out_of_stock_items' => $items->where('current_quantity', 0)->count(),
             'average_stock_value' => $items->avg(function ($item) {
-                return $item->quantity * $item->unit_cost;
+                return ($item->current_quantity ?? 0) * ($item->unit_cost ?? 0);
             })
         ]);
     }
@@ -268,18 +268,18 @@ class ReportsController extends Controller
         $data = InventoryItem::select(
                 'id as item_id',
                 'name as item_name',
-                'quantity as current_quantity',
+                'current_quantity',
                 'unit_cost',
-                DB::raw('quantity * unit_cost as total_value'),
-                'reorder_level',
+                DB::raw('COALESCE(current_quantity,0) * COALESCE(unit_cost,0) as total_value'),
+                DB::raw('COALESCE(minimum_quantity, 10) as reorder_level'),
                 'updated_at as last_restock_date'
             )
             ->get()
             ->map(function ($item) {
                 $status = 'in_stock';
-                if ($item->current_quantity == 0) {
+                if (($item->current_quantity ?? 0) == 0) {
                     $status = 'out_of_stock';
-                } elseif ($item->current_quantity <= $item->reorder_level) {
+                } elseif (($item->current_quantity ?? 0) <= $item->reorder_level) {
                     $status = 'low_stock';
                 }
                 
@@ -385,7 +385,7 @@ class ReportsController extends Controller
                 'customers.id as customer_id',
                 'customers.name as customer_name',
                 'customers.created_at as customer_since',
-                DB::raw('SUM(invoices.total_amount) as total_purchases'),
+                DB::raw('SUM(invoices.total) as total_purchases'),
                 DB::raw('SUM(invoices.paid_amount) as total_paid'),
                 DB::raw('COUNT(invoices.id) as invoice_count'),
                 DB::raw('MAX(invoices.invoice_date) as last_purchase_date')
@@ -546,13 +546,12 @@ class ReportsController extends Controller
         $endDate = $request->input('end_date', Carbon::now()->format('Y-m-d'));
 
         $totalRevenue = Invoice::whereBetween('invoice_date', [$startDate, $endDate])
-            ->sum('total_amount');
+            ->sum('total');
 
         // تكلفة البضاعة المباعة
         $costOfGoodsSold = InvoiceItem::join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
-            ->join('products', 'invoice_items.product_id', '=', 'products.id')
             ->whereBetween('invoices.invoice_date', [$startDate, $endDate])
-            ->sum(DB::raw('invoice_items.quantity * products.cost'));
+            ->sum('invoice_items.total_cost');
 
         $grossProfit = $totalRevenue - $costOfGoodsSold;
 
@@ -584,7 +583,7 @@ class ReportsController extends Controller
 
         $totalRevenue = Invoice::whereMonth('invoice_date', $currentMonth)
             ->whereYear('invoice_date', $currentYear)
-            ->sum('total_amount');
+            ->sum('total');
 
         $totalExpenses = Expense::whereMonth('expense_date', $currentMonth)
             ->whereYear('expense_date', $currentYear)
@@ -598,9 +597,9 @@ class ReportsController extends Controller
 
         $pendingPayments = Invoice::whereMonth('invoice_date', $currentMonth)
             ->whereYear('invoice_date', $currentYear)
-            ->sum(DB::raw('total_amount - paid_amount'));
+            ->sum(DB::raw('total - paid_amount'));
 
-        $lowStockItems = InventoryItem::where('quantity', '<=', 10)->count();
+        $lowStockItems = InventoryItem::where('current_quantity', '<=', 10)->count();
 
         $activeCustomers = Invoice::whereMonth('invoice_date', $currentMonth)
             ->whereYear('invoice_date', $currentYear)
@@ -610,7 +609,7 @@ class ReportsController extends Controller
         // نمو الإيرادات مقارنة بالشهر السابق
         $previousMonthRevenue = Invoice::whereMonth('invoice_date', $currentMonth - 1)
             ->whereYear('invoice_date', $currentYear)
-            ->sum('total_amount');
+            ->sum('total');
 
         $revenueGrowth = $previousMonthRevenue > 0 
             ? (($totalRevenue - $previousMonthRevenue) / $previousMonthRevenue) * 100 

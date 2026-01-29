@@ -101,6 +101,42 @@ class AccountantController extends Controller
         $receivables_percentage = $total_revenue > 0 ? min(100, round(($customer_debts / $total_revenue) * 100, 1)) : 0;
         $payables_percentage = $total_expenses > 0 ? min(100, round(($supplier_debts / $total_expenses) * 100, 1)) : 0;
 
+        // 9. مؤشرات الأداء الرئيسية (KPIs)
+        $gross_profit_margin = $total_revenue > 0 ? round(($gross_profit / $total_revenue) * 100, 2) : 0;
+        $net_profit_margin = $total_revenue > 0 ? round(($net_profit / $total_revenue) * 100, 2) : 0;
+        $operating_expense_ratio = $total_revenue > 0 ? round(($total_expenses / $total_revenue) * 100, 2) : 0;
+        
+        // نسب السيولة
+        $current_ratio = $total_liabilities > 0 ? round($total_assets / $total_liabilities, 2) : 0;
+        $quick_ratio = $total_liabilities > 0 ? round(($total_cash + $customer_debts) / $total_liabilities, 2) : 0;
+        
+        // متوسط أيام الجمع (DPO - Days Payable Outstanding)
+        $avg_daily_revenue = $daysDiff > 0 ? $total_revenue / $daysDiff : 0;
+        $dpo = $avg_daily_revenue > 0 ? round($customer_debts / $avg_daily_revenue, 2) : 0;
+
+        // عدد الفواتير المدفوعة
+        $paid_invoices = DB::table('invoices')
+            ->where('status', '!=', 'cancelled')
+            ->where('remaining_amount', '=', 0)
+            ->count();
+
+        // متوسط قيمة الفاتورة
+        $avg_invoice_value = (($paid_invoices + $unpaid_invoices) > 0) 
+            ? round($total_revenue / ($paid_invoices + $unpaid_invoices), 2)
+            : 0;
+
+        // عدد الموردين النشطين
+        $active_suppliers = DB::table('suppliers')
+            ->where('is_active', true)
+            ->count();
+
+        // عدد العملاء الذين لديهم ديون
+        $customers_with_receivables = DB::table('invoices')
+            ->where('status', '!=', 'cancelled')
+            ->where('remaining_amount', '>', 0)
+            ->distinct('customer_id')
+            ->count();
+
         return response()->json([
             // البيانات الأساسية للـ Frontend
             'total_revenue' => $total_revenue,
@@ -114,17 +150,32 @@ class AccountantController extends Controller
             // بيانات المستحقات
             'customer_receivables' => $customer_debts,
             'unpaid_invoices' => $unpaid_invoices,
+            'paid_invoices' => $paid_invoices,
             'receivables_percentage' => $receivables_percentage,
+            'customers_with_receivables' => $customers_with_receivables,
 
             // بيانات المطلوبات
             'supplier_payables' => $supplier_debts,
             'outstanding_debts' => $other_debts,
             'payables_percentage' => $payables_percentage,
+            'active_suppliers' => $active_suppliers,
 
             // بيانات النقد
             'cash_balance' => $cashBalance->cash_balance ?? 0,
             'bank_balance' => $cashBalance->bank_balance ?? 0,
             'total_cash' => $total_cash,
+
+            // مؤشرات الأداء الرئيسية (KPIs)
+            'kpis' => [
+                'gross_profit_margin' => $gross_profit_margin,
+                'net_profit_margin' => $net_profit_margin,
+                'operating_expense_ratio' => $operating_expense_ratio,
+                'current_ratio' => $current_ratio,
+                'quick_ratio' => $quick_ratio,
+                'days_payable_outstanding' => $dpo,
+                'avg_invoice_value' => $avg_invoice_value,
+                'cogs_percentage' => $total_revenue > 0 ? round(($total_cogs / $total_revenue) * 100, 2) : 0,
+            ],
 
             // بيانات تفصيلية
             'assets' => [
@@ -144,6 +195,7 @@ class AccountantController extends Controller
             'period' => [
                 'start_date' => $startDate,
                 'end_date' => $endDate,
+                'days' => $daysDiff,
             ],
         ]);
     }
@@ -370,4 +422,182 @@ class AccountantController extends Controller
             'by_type' => $byType,
         ]);
     }
+
+    /**
+     * تحليل تفصيلي للأداء
+     */
+    public function analyticsReport(Request $request)
+    {
+        $startDate = $request->get('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
+        $endDate = $request->get('end_date', Carbon::now()->endOfMonth()->format('Y-m-d'));
+
+        // البيانات الأساسية
+        $daysDiff = Carbon::parse($startDate)->diffInDays(Carbon::parse($endDate)) + 1;
+
+        // جودة العملاء
+        $topCustomers = DB::table('invoices')
+            ->selectRaw('customer_id, customers.name, COUNT(*) as invoice_count, SUM(total) as total_amount, SUM(remaining_amount) as outstanding')
+            ->leftJoin('customers', 'invoices.customer_id', '=', 'customers.id')
+            ->where('invoices.status', '!=', 'cancelled')
+            ->whereBetween('invoices.invoice_date', [$startDate, $endDate])
+            ->groupBy('customer_id', 'customers.name')
+            ->orderByDesc('total_amount')
+            ->limit(10)
+            ->get();
+
+        // تحليل المنتجات
+        $topProducts = DB::table('invoice_items')
+            ->selectRaw('product_id, products.name, SUM(quantity) as quantity_sold, SUM(price * quantity) as revenue, SUM(cost * quantity) as cost')
+            ->leftJoin('products', 'invoice_items.product_id', '=', 'products.id')
+            ->join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
+            ->where('invoices.status', '!=', 'cancelled')
+            ->whereBetween('invoices.invoice_date', [$startDate, $endDate])
+            ->groupBy('product_id', 'products.name')
+            ->orderByDesc('revenue')
+            ->limit(10)
+            ->get();
+
+        // تحليل المصروفات
+        $expenseAnalysis = DB::table('expenses')
+            ->selectRaw('expense_types.name, COUNT(*) as count, SUM(amount) as total_amount, AVG(amount) as avg_amount')
+            ->leftJoin('expense_types', 'expenses.expense_type_id', '=', 'expense_types.id')
+            ->whereBetween('expense_date', [$startDate, $endDate])
+            ->groupBy('expense_types.name')
+            ->orderByDesc('total_amount')
+            ->get();
+
+        // الاتجاهات الأسبوعية
+        $weeklyTrend = DB::table('invoices')
+            ->selectRaw('YEARWEEK(invoice_date) as week, SUM(total) as revenue, COUNT(*) as invoice_count')
+            ->where('status', '!=', 'cancelled')
+            ->whereBetween('invoice_date', [$startDate, $endDate])
+            ->groupBy('week')
+            ->orderBy('week')
+            ->get();
+
+        return response()->json([
+            'period' => [
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+                'days' => $daysDiff,
+            ],
+            'top_customers' => $topCustomers,
+            'top_products' => $topProducts,
+            'expense_analysis' => $expenseAnalysis,
+            'weekly_trend' => $weeklyTrend,
+        ]);
+    }
+
+    /**
+     * مؤشرات الصحة المالية
+     */
+    public function financialHealth(Request $request)
+    {
+        $cashBalance = DB::table('cash_balance')->first();
+        $total_cash = $cashBalance ? ($cashBalance->cash_balance + $cashBalance->bank_balance) : 0;
+
+        // الفترة الحالية والسابقة
+        $currentMonth = now()->month;
+        $currentYear = now()->year;
+        
+        $prevMonth = $currentMonth == 1 ? 12 : $currentMonth - 1;
+        $prevYear = $currentMonth == 1 ? $currentYear - 1 : $currentYear;
+
+        // المؤشرات
+        $currentRevenue = DB::table('invoices')
+            ->where('status', '!=', 'cancelled')
+            ->whereMonth('invoice_date', $currentMonth)
+            ->whereYear('invoice_date', $currentYear)
+            ->sum('total');
+
+        $prevRevenue = DB::table('invoices')
+            ->where('status', '!=', 'cancelled')
+            ->whereMonth('invoice_date', $prevMonth)
+            ->whereYear('invoice_date', $prevYear)
+            ->sum('total');
+
+        $currentExpenses = DB::table('expenses')
+            ->whereMonth('expense_date', $currentMonth)
+            ->whereYear('expense_date', $currentYear)
+            ->sum('amount');
+
+        $prevExpenses = DB::table('expenses')
+            ->whereMonth('expense_date', $prevMonth)
+            ->whereYear('expense_date', $prevYear)
+            ->sum('amount');
+
+        // الصحة المالية
+        $health_score = 0;
+        $warnings = [];
+        $recommendations = [];
+
+        // 1. النقدية
+        $current_ratio = DB::table('invoices')->where('status', '!=', 'cancelled')->sum('remaining_amount') > 0 
+            ? $total_cash / DB::table('invoices')->where('status', '!=', 'cancelled')->sum('remaining_amount')
+            : 0;
+
+        if ($current_ratio > 2) {
+            $health_score += 20;
+        } elseif ($current_ratio > 1.5) {
+            $health_score += 15;
+        } elseif ($current_ratio < 1) {
+            $warnings[] = 'النقدية غير كافية لتغطية الالتزامات';
+            $recommendations[] = 'يجب زيادة النقدية أو تقليل الالتزامات';
+        }
+
+        // 2. نمو الإيرادات
+        $revenue_growth = $prevRevenue > 0 ? (($currentRevenue - $prevRevenue) / $prevRevenue) * 100 : 0;
+        if ($revenue_growth > 10) {
+            $health_score += 25;
+        } elseif ($revenue_growth > 0) {
+            $health_score += 15;
+        } else {
+            $warnings[] = 'تراجع في الإيرادات مقارنة بالشهر السابق';
+            $recommendations[] = 'زيادة جهود المبيعات والتسويق';
+        }
+
+        // 3. تحكم في المصروفات
+        $expense_ratio = $currentRevenue > 0 ? ($currentExpenses / $currentRevenue) * 100 : 0;
+        if ($expense_ratio < 20) {
+            $health_score += 25;
+        } elseif ($expense_ratio < 30) {
+            $health_score += 15;
+        } else {
+            $warnings[] = 'المصروفات مرتفعة جداً مقارنة بالإيرادات';
+            $recommendations[] = 'مراجعة وتقليل المصروفات غير الضرورية';
+        }
+
+        // 4. الديون المستحقة
+        $uncollected_amount = DB::table('invoices')
+            ->where('status', '!=', 'cancelled')
+            ->where('remaining_amount', '>', 0)
+            ->sum('remaining_amount');
+
+        $collection_rate = $currentRevenue > 0 ? (($currentRevenue - $uncollected_amount) / $currentRevenue) * 100 : 100;
+        if ($collection_rate > 90) {
+            $health_score += 25;
+        } elseif ($collection_rate > 75) {
+            $health_score += 15;
+        } else {
+            $warnings[] = 'معدل تحصيل منخفض';
+            $recommendations[] = 'تقوية عملية المتابعة مع العملاء';
+        }
+
+        // 5. الحد الأدنى
+        $health_score = max(0, min(100, $health_score));
+
+        return response()->json([
+            'health_score' => $health_score,
+            'status' => $health_score >= 75 ? 'ممتاز' : ($health_score >= 50 ? 'جيد' : 'يحتاج تحسين'),
+            'metrics' => [
+                'current_ratio' => round($current_ratio, 2),
+                'revenue_growth' => round($revenue_growth, 2),
+                'expense_ratio' => round($expense_ratio, 2),
+                'collection_rate' => round($collection_rate, 2),
+            ],
+            'warnings' => $warnings,
+            'recommendations' => $recommendations,
+        ]);
+    }
 }
+
