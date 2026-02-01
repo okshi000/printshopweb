@@ -1,23 +1,35 @@
 #!/bin/bash
 
-# التعامل مع الأخطاء - إيقاف السكربت عند حدوث أي خطأ
-set -e
+echo "🚀 Starting deployment setup..."
 
-echo "🚀 Starting deployment script..."
+# 1. الانتقال لمجلد الباك اند
+cd /home/site/wwwroot/backend
 
-# نسخ ملف index.html الخاص بالرياكت إلى مجلد الـ public في لارافل (في حالة الدمج)
-# cp /home/site/wwwroot/public/dist/index.html /home/site/wwwroot/public/index.html || true
+# 2. تثبيت المكتبات (إذا لم تكن موجودة)
+if [ ! -d "vendor" ]; then
+    echo "📦 Vendor folder not found. Installing dependencies..."
+    composer install --no-interaction --prefer-dist --optimize-autoloader
+fi
 
-# تشغيل الأوامر الأساسية لتهيئة لارافل
-echo "Caching configuration..."
+# 3. تعديل إعدادات Apache لتشير إلى backend/public
+echo "🔧 Configuring Apache DocumentRoot..."
+sed -i "s|/var/www/html|/home/site/wwwroot/backend/public|g" /etc/apache2/sites-available/000-default.conf
+sed -i "s|AllowOverride None|AllowOverride All|g" /etc/apache2/apache2.conf
+
+# 4. إصلاح صلاحيات مجلد التخزين
+echo "🔒 Fixing permissions..."
+chown -R www-data:www-data /home/site/wwwroot/backend/storage
+chmod -R 775 /home/site/wwwroot/backend/storage
+
+# 5. تشغيل أوامر لارافل
+echo "⚙️ Running Laravel commands..."
+php artisan config:clear
+php artisan migrate --force
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
-echo "Running migrations..."
-php artisan migrate --force
+echo "✅ Setup complete. Starting Server..."
 
-echo "Deployment finished successfully."
-
-# تشغيل السيرفر (Apache) في النهاية
-# apache2-foreground
+# 6. تشغيل السيرفر
+apache2-foreground
