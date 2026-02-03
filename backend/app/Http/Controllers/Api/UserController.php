@@ -49,6 +49,7 @@ class UserController extends Controller
 
         $user = User::create([
             'name' => $request->name,
+            'full_name' => $request->name, // استخدام name كـ full_name
             'email' => $request->email,
             'password' => Hash::make($request->password),
         ]);
