@@ -51,7 +51,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn, formatCurrency, formatDateTime, fadeInUp, staggerContainer, staggerItem } from '@/lib/utils'
 import { cashApi } from '../api'
 import type { CashMovement } from '../types'

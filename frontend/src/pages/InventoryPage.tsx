@@ -47,28 +47,15 @@ export default function InventoryPage() {
   const queryClient = useQueryClient()
   const { hasPermission } = useAuth()
   const [page, setPage] = useState(1)
-  const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [movementModalOpen, setMovementModalOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null)
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
 
-  // Debounce search
-  const handleSearchChange = (value: string) => {
-    setSearch(value)
-    const timeoutId = setTimeout(() => {
-      setDebouncedSearch(value)
-      setPage(1)
-    }, 300)
-    return () => clearTimeout(timeoutId)
-  }
-
   const { data, isLoading, error } = useQuery({
-    queryKey: ['inventory', page, debouncedSearch],
+    queryKey: ['inventory', page],
     queryFn: async () => {
       const params: Record<string, string | number> = { page, per_page: 10 }
-      if (debouncedSearch) params.search = debouncedSearch
       const res = await inventoryApi.list(params)
       return res.data
     },

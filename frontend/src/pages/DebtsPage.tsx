@@ -66,19 +66,6 @@ export default function DebtsPage() {
   const [activeTab, setActiveTab] = useState('accounts')
   const [page, setPage] = useState(1)
   const [debtsPage, setDebtsPage] = useState(1)
-  const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-  
-  // Debounce search
-  const handleSearchChange = (value: string) => {
-    setSearch(value)
-    const timeoutId = setTimeout(() => {
-      setDebouncedSearch(value)
-      setPage(1)
-      setDebtsPage(1)
-    }, 300)
-    return () => clearTimeout(timeoutId)
-  }
   
   // Modal states
   const [accountModalOpen, setAccountModalOpen] = useState(false)
@@ -91,10 +78,9 @@ export default function DebtsPage() {
 
   // Queries
   const { data: accountsData, isLoading: accountsLoading } = useQuery({
-    queryKey: ['debt-accounts', page, debouncedSearch],
+    queryKey: ['debt-accounts', page],
     queryFn: async () => {
       const params: Record<string, string | number> = { page, per_page: 10 }
-      if (debouncedSearch) params.search = debouncedSearch
       const res = await debtAccountsApi.list(params)
       return res.data
     },
@@ -111,10 +97,9 @@ export default function DebtsPage() {
   })
 
   const { data: debtsData, isLoading: debtsLoading } = useQuery({
-    queryKey: ['debts', debtsPage, debouncedSearch],
+    queryKey: ['debts', debtsPage],
     queryFn: async () => {
       const params: Record<string, string | number> = { page: debtsPage, per_page: 10 }
-      if (debouncedSearch) params.search = debouncedSearch
       const res = await debtsApi.list(params)
       return res.data
     },

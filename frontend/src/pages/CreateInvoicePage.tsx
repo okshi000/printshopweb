@@ -26,6 +26,19 @@ import { cn, formatCurrency, fadeInUp, staggerContainer } from '@/lib/utils'
 import { invoicesApi, customersApi, productsApi, suppliersApi } from '../api'
 import type { Customer, Product } from '../types'
 
+// Generate a UUID compatible with all browsers
+const generateUUID = (): string => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+  // Fallback for older browsers
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
 interface Supplier { id: number; name: string }
 
 interface ItemCost {
@@ -80,13 +93,13 @@ export default function CreateInvoicePage() {
           
           // Convert invoice items to form format
           const formItems: InvoiceItem[] = invoice.items.map((item: any) => ({
-            id: crypto.randomUUID(),
+            id: generateUUID(),
             product_id: item.product_id?.toString() || null,
             quantity: item.quantity,
             price: item.unit_price,
             item_notes: item.description || '',
             costs: item.costs?.map((cost: any) => ({
-              id: crypto.randomUUID(),
+              id: generateUUID(),
               supplier_id: cost.supplier_id?.toString() || null,
               cost_type: cost.cost_type,
               amount: cost.amount,
@@ -150,7 +163,7 @@ export default function CreateInvoicePage() {
 
   const addItem = () => {
     setItems([...items, {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       product_id: null,
       quantity: 1,
       price: 0,
@@ -181,7 +194,7 @@ export default function CreateInvoicePage() {
   const addCost = (itemId: string) => {
     setItems(items.map((item) =>
       item.id === itemId
-        ? { ...item, costs: [...item.costs, { id: crypto.randomUUID(), supplier_id: null, cost_type: '', amount: 0 }] }
+        ? { ...item, costs: [...item.costs, { id: generateUUID(), supplier_id: null, cost_type: '', amount: 0 }] }
         : item
     ))
   }

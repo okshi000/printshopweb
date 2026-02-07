@@ -212,12 +212,6 @@ export default function SuppliersPage() {
     setModalOpen(true);
   };
 
-  const handlePayment = (supplier: Supplier) => {
-    setPayingSupplier(supplier);
-    paymentForm.reset({ amount: 0, payment_method: 'cash', notes: '' });
-    setPaymentModalOpen(true);
-  };
-
   const handleCloseModal = () => {
     setModalOpen(false);
     setEditingSupplier(null);
