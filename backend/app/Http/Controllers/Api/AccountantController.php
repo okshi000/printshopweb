@@ -447,7 +447,7 @@ class AccountantController extends Controller
 
         // تحليل المنتجات
         $topProducts = DB::table('invoice_items')
-            ->selectRaw('product_id, products.name, SUM(quantity) as quantity_sold, SUM(total_price) as revenue, SUM(total_cost) as cost')
+            ->selectRaw('product_id, products.name, SUM(invoice_items.quantity) as quantity_sold, SUM(invoice_items.total_price) as revenue, SUM(invoice_items.total_cost) as cost')
             ->leftJoin('products', 'invoice_items.product_id', '=', 'products.id')
             ->join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
             ->where('invoices.status', '!=', 'cancelled')
