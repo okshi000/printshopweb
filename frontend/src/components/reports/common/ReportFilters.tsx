@@ -1,6 +1,7 @@
 // مكون فلاتر التقارير
 
 import React from 'react';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Calendar as CalendarIcon, Filter, X } from 'lucide-react';
@@ -59,6 +60,7 @@ export const ReportFilters: React.FC<ReportFiltersProps> = ({
   additionalFilters,
   className = '',
 }) => {
+  const isMobile = useIsMobile();
   const handleQuickFilter = (days: number) => {
     const now = new Date();
     const from = new Date();
@@ -114,7 +116,7 @@ export const ReportFilters: React.FC<ReportFiltersProps> = ({
                     onPeriodChange('custom');
                   }
                 }}
-                numberOfMonths={2}
+                numberOfMonths={isMobile ? 1 : 2}
                 locale={ar}
               />
             </PopoverContent>

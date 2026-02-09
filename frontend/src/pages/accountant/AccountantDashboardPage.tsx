@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns'
 import { ar } from 'date-fns/locale'
 import { useState } from 'react'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import {
   Calculator, TrendingUp, TrendingDown, DollarSign, Wallet, CreditCard,
   Calendar as CalendarIcon, ArrowUp, ArrowDown, BarChart3, PieChart,
@@ -186,6 +187,7 @@ function HealthScoreCard({ score, status, warnings, recommendations }: {
 }
 
 export default function AccountantDashboardPage() {
+  const isMobile = useIsMobile();
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
@@ -285,7 +287,7 @@ export default function AccountantDashboardPage() {
         </div>
         <div className="flex items-center gap-2">
           <Select value={period} onValueChange={handlePeriodChange}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-full sm:w-40">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -307,7 +309,7 @@ export default function AccountantDashboardPage() {
                 mode="range"
                 selected={{ from: dateRange.from, to: dateRange.to }}
                 onSelect={(range) => range?.from && range?.to && setDateRange({ from: range.from, to: range.to })}
-                numberOfMonths={2}
+                numberOfMonths={isMobile ? 1 : 2}
               />
             </PopoverContent>
           </Popover>

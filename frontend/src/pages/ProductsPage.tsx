@@ -635,7 +635,7 @@ export default function ProductsPage() {
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="p-3 rounded-lg bg-primary/10 text-center">
                     <DollarSign className="h-5 w-5 mx-auto mb-1 text-primary" />
                     <div className="text-sm text-muted-foreground">سعر البيع</div>

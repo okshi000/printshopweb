@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { format, formatDistanceToNow } from 'date-fns'
@@ -98,6 +99,7 @@ const entityLabels: Record<string, string> = {
 }
 
 export default function ActivityPage() {
+  const isMobile = useIsMobile();
   const [search, setSearch] = useState('')
   const [actionFilter, setActionFilter] = useState<string>('all')
   const [entityFilter, setEntityFilter] = useState<string>('all')
@@ -160,7 +162,7 @@ export default function ActivityPage() {
                 />
               </div>
               <Select value={actionFilter} onValueChange={setActionFilter}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-full sm:w-40">
                   <SelectValue placeholder="نوع العملية" />
                 </SelectTrigger>
                 <SelectContent>
@@ -173,7 +175,7 @@ export default function ActivityPage() {
                 </SelectContent>
               </Select>
               <Select value={entityFilter} onValueChange={setEntityFilter}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-full sm:w-40">
                   <SelectValue placeholder="النوع" />
                 </SelectTrigger>
                 <SelectContent>
@@ -201,7 +203,7 @@ export default function ActivityPage() {
                     mode="range"
                     selected={{ from: dateRange.from, to: dateRange.to }}
                     onSelect={(range) => setDateRange({ from: range?.from, to: range?.to })}
-                    numberOfMonths={2}
+                    numberOfMonths={isMobile ? 1 : 2}
                   />
                 </PopoverContent>
               </Popover>

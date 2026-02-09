@@ -10,19 +10,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-
-// Hook to detect mobile screen
-function useIsMobile(breakpoint = 640) {
-  const [isMobile, setIsMobile] = React.useState(
-    typeof window !== 'undefined' ? window.innerWidth < breakpoint : false
-  );
-  React.useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < breakpoint);
-    window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
-  }, [breakpoint]);
-  return isMobile;
-}
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>
 

@@ -664,7 +664,7 @@ export default function SuppliersPage() {
                 <p>{viewingSupplier.address || '-'}</p>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="p-3 rounded-lg bg-muted/50 text-center">
                   <div className="text-sm text-muted-foreground mb-1">إجمالي المشتريات</div>
                   <p className="text-lg font-bold">
