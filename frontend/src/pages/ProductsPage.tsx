@@ -387,7 +387,7 @@ export default function ProductsPage() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center justify-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -501,7 +501,7 @@ export default function ProductsPage() {
               )}
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>الفئة</Label>
                 <Select
@@ -530,7 +530,7 @@ export default function ProductsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="unit_price">سعر البيع</Label>
                 <Input
@@ -659,7 +659,7 @@ export default function ProductsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="p-3 rounded-lg border">
                     <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
                       <Layers className="h-4 w-4" />

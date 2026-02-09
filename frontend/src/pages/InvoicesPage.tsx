@@ -264,7 +264,7 @@ export default function InvoicesPage() {
             
             <div className="flex flex-wrap gap-2">
               <Select value={invoiceStatusFilter} onValueChange={(value) => { setInvoiceStatusFilter(value); setPage(1); }}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="w-full sm:w-[150px]">
                   <Filter className="h-4 w-4 ml-2" />
                   <SelectValue placeholder="حالة الفاتورة" />
                 </SelectTrigger>
@@ -280,7 +280,7 @@ export default function InvoicesPage() {
               </Select>
 
               <Select value={paymentStatusFilter} onValueChange={(value) => { setPaymentStatusFilter(value); setPage(1); }}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="w-full sm:w-[150px]">
                   <Banknote className="h-4 w-4 ml-2" />
                   <SelectValue placeholder="حالة الدفع" />
                 </SelectTrigger>
@@ -438,7 +438,7 @@ export default function InvoicesPage() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center justify-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                               <Button
                                 variant="ghost"
                                 size="icon"

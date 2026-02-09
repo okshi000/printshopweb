@@ -11,6 +11,19 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 
+// Hook to detect mobile screen
+function useIsMobile(breakpoint = 640) {
+  const [isMobile, setIsMobile] = React.useState(
+    typeof window !== 'undefined' ? window.innerWidth < breakpoint : false
+  );
+  React.useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < breakpoint);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, [breakpoint]);
+  return isMobile;
+}
+
 export type CalendarProps = React.ComponentProps<typeof DayPicker>
 
 function Calendar({
@@ -125,6 +138,7 @@ function DateRangePicker({
   disabled,
   className,
 }: DateRangePickerProps) {
+  const isMobile = useIsMobile();
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -157,7 +171,7 @@ function DateRangePicker({
           mode="range"
           selected={{ from, to }}
           onSelect={(range) => onSelect?.(range || { from: undefined, to: undefined })}
-          numberOfMonths={2}
+          numberOfMonths={isMobile ? 1 : 2}
           initialFocus
         />
       </PopoverContent>

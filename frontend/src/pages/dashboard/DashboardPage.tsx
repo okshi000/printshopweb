@@ -209,7 +209,7 @@ export default function DashboardPage() {
               </Link>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <motion.div
                   whileHover={{ scale: 1.02 }}
                   className="flex items-center gap-3 p-4 rounded-xl bg-primary/5 border border-primary/10"

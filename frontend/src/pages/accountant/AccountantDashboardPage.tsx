@@ -563,8 +563,8 @@ export default function AccountantDashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-wrap items-center gap-8">
-                <ResponsiveContainer width="50%" height={250}>
+              <div className="flex flex-col md:flex-row flex-wrap items-center gap-8">
+                <ResponsiveContainer width="100%" height={250} className="md:max-w-[50%]">
                   <RechartsPieChart>
                     <Pie
                       data={expenseChart.by_type}

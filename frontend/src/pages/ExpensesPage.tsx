@@ -404,7 +404,7 @@ export default function ExpensesPage() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <div className="flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="flex items-center justify-center md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                 {hasPermission('expenses.delete') && (
                                   <Button
                                     variant="ghost"
@@ -653,7 +653,7 @@ export default function ExpensesPage() {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="amount">المبلغ *</Label>
                 <Input

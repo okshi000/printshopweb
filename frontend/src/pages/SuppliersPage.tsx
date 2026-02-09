@@ -364,7 +364,7 @@ export default function SuppliersPage() {
                             </span>
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center justify-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -495,7 +495,7 @@ export default function SuppliersPage() {
                 <p className="text-sm text-destructive">{form.formState.errors.type.message}</p>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="phone">الهاتف</Label>
                 <Input
@@ -639,7 +639,7 @@ export default function SuppliersPage() {
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 text-muted-foreground text-sm">
                     <Phone className="h-4 w-4" />
