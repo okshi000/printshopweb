@@ -285,8 +285,8 @@ class FinancialReportController extends Controller
         
         $totalAssets = $currentAssets + $fixedAssets;
 
-        // المطلوبات (الديون المستحقة للموردين)
-        $payables = \App\Models\SupplierPayment::whereNull('payment_date')->sum('amount') ?? 0;
+        // المطلوبات (الديون المستحقة للموردين - التكاليف غير المدفوعة)
+        $payables = \App\Models\ItemCost::where('is_paid', false)->where('is_internal', false)->sum('amount') ?? 0;
         $totalLiabilities = $payables;
 
         // حقوق الملكية

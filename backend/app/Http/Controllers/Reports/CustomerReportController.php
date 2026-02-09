@@ -73,7 +73,6 @@ class CustomerReportController extends Controller
                 'customers.id as customer_id',
                 'customers.name as customer_name',
                 'customers.phone as customer_phone',
-                'customers.email as customer_email',
                 'customers.created_at as customer_since'
             )
             ->get()

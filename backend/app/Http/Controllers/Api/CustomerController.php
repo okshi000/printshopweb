@@ -61,7 +61,7 @@ class CustomerController extends Controller
         $customer->loadCount('invoices');
         
         // Calculate statistics
-        $totalAmount = $customer->invoices()->sum('total_amount');
+        $totalAmount = $customer->invoices()->sum('total');
         $paidAmount = $customer->invoices()->sum('paid_amount');
         $remainingAmount = $customer->invoices()->sum('remaining_amount');
         
@@ -113,7 +113,7 @@ class CustomerController extends Controller
     public function transactions(Customer $customer): JsonResponse
     {
         $invoices = $customer->invoices()
-            ->select('id', 'invoice_number', 'total_amount as amount', 'status', 'created_at')
+            ->select('id', 'invoice_number', 'total as amount', 'status', 'created_at')
             ->get()
             ->map(function ($invoice) {
                 $invoice->type = 'invoice';

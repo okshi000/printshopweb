@@ -25,7 +25,8 @@ class CashflowReportController extends Controller
         $endDate = $request->input('end_date', Carbon::now()->format('Y-m-d'));
 
         // الرصيد الافتتاحي - مجموع أرصدة بداية الفترة
-        $openingBalance = CashBalance::sum('balance');
+        $cashBalanceRecord = CashBalance::first();
+        $openingBalance = $cashBalanceRecord ? $cashBalanceRecord->cash_balance + $cashBalanceRecord->bank_balance : 0;
         
         // إجمالي الإيداعات
         $totalInflows = CashMovement::whereIn('movement_type', ['income', 'initial'])
@@ -91,7 +92,8 @@ class CashflowReportController extends Controller
             ->get();
 
         // حساب الرصيد التراكمي
-        $balance = CashBalance::sum('balance');
+        $cashBalanceRecord = CashBalance::first();
+        $balance = $cashBalanceRecord ? $cashBalanceRecord->cash_balance + $cashBalanceRecord->bank_balance : 0;
         
         $result = $data->map(function ($item) use (&$balance) {
             $netFlow = $item->inflows - $item->outflows;
@@ -215,26 +217,37 @@ class CashflowReportController extends Controller
      */
     public function balanceBySource(Request $request)
     {
-        $data = CashBalance::select(
-            'id',
-            'name as source_name',
-            'balance',
-            'updated_at as last_updated'
-        )
-        ->get();
+        $cashBalanceRecord = CashBalance::first();
+        
+        if (!$cashBalanceRecord) {
+            return response()->json([]);
+        }
 
-        $total = $data->sum('balance');
+        $cashBalance = (float) $cashBalanceRecord->cash_balance;
+        $bankBalance = (float) $cashBalanceRecord->bank_balance;
+        $total = $cashBalance + $bankBalance;
 
-        $result = $data->map(function ($item) use ($total) {
-            // حساب عدد الحركات باستخدام حقل source بدلاً من cash_balance_id
-            $sourceName = strtolower(str_replace(' ', '_', $item->source_name));
-            $transactionCount = CashMovement::where('source', $sourceName)->count();
+        $cashTransactions = CashMovement::where('source', 'cash')->count();
+        $bankTransactions = CashMovement::where('source', 'bank')->count();
 
-            return array_merge($item->toArray(), [
-                'percentage' => $total > 0 ? round(($item->balance / $total) * 100, 2) : 0,
-                'transaction_count' => $transactionCount
-            ]);
-        });
+        $result = [
+            [
+                'id' => 1,
+                'source_name' => 'الصندوق (كاش)',
+                'balance' => $cashBalance,
+                'last_updated' => $cashBalanceRecord->updated_at,
+                'percentage' => $total > 0 ? round(($cashBalance / $total) * 100, 2) : 0,
+                'transaction_count' => $cashTransactions
+            ],
+            [
+                'id' => 2,
+                'source_name' => 'البنك',
+                'balance' => $bankBalance,
+                'last_updated' => $cashBalanceRecord->updated_at,
+                'percentage' => $total > 0 ? round(($bankBalance / $total) * 100, 2) : 0,
+                'transaction_count' => $bankTransactions
+            ]
+        ];
 
         return response()->json($result);
     }
@@ -262,7 +275,8 @@ class CashflowReportController extends Controller
             ->whereDate('movement_date', $date)
             ->count();
 
-        $currentBalance = CashBalance::sum('balance');
+        $cashBalanceRecord = CashBalance::first();
+        $currentBalance = $cashBalanceRecord ? $cashBalanceRecord->cash_balance + $cashBalanceRecord->bank_balance : 0;
 
         return response()->json([
             'date' => $date,
@@ -292,7 +306,8 @@ class CashflowReportController extends Controller
             ->where('movement_date', '>=', $lastMonth)
             ->avg(DB::raw('amount'));
 
-        $currentBalance = CashBalance::sum('balance');
+        $cashBalanceRecord = CashBalance::first();
+        $currentBalance = $cashBalanceRecord ? $cashBalanceRecord->cash_balance + $cashBalanceRecord->bank_balance : 0;
         $avgNetFlow = ($avgDailyInflow ?? 0) - ($avgDailyOutflow ?? 0);
 
         $forecast = [];

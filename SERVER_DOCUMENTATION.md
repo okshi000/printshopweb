@@ -38,7 +38,7 @@ SSH Port: 22
 ```
 Database Name: printshop
 Database User: printshop
-Database Password: strong_password
+Database Password: 
 Database Host: 127.0.0.1
 Database Port: 3306
 ```

@@ -152,7 +152,7 @@ class SupplierController extends Controller
     public function transactions(Supplier $supplier): JsonResponse
     {
         $payments = $supplier->payments()
-            ->select('id', 'amount', 'payment_method', 'notes as description', 'created_at', 'payment_date')
+            ->select('id', 'amount', 'payment_method', 'notes as description', 'created_at')
             ->get()
             ->map(function ($payment) {
                 $payment->type = 'payment';
