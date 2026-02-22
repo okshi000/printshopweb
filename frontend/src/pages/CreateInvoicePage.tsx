@@ -19,9 +19,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { cn, formatCurrency, fadeInUp, staggerContainer } from '@/lib/utils'
 import { invoicesApi, customersApi, productsApi, suppliersApi } from '../api'
 import type { Customer, Product } from '../types'
@@ -68,9 +66,6 @@ export default function CreateInvoicePage() {
   const [deliveryDate, setDeliveryDate] = useState<Date | null>(null)
   const [notes, setNotes] = useState('')
   const [isLoadingInvoice, setIsLoadingInvoice] = useState(false)
-  const [customerSearch, setCustomerSearch] = useState('')
-  const [productSearch, setProductSearch] = useState('')
-  const [supplierSearch, setSupplierSearch] = useState('')
 
   // Set customer from URL parameter if provided
   useEffect(() => {
@@ -118,34 +113,46 @@ export default function CreateInvoicePage() {
   }, [isEditMode, id])
 
   const { data: customers, isLoading: customersLoading } = useQuery({
-    queryKey: ['customers', customerSearch],
+    queryKey: ['customers-all'],
     queryFn: async () => {
-      const params: any = { active_only: true }
-      if (customerSearch) params.search = customerSearch
-      const res = await customersApi.list(params)
+      const res = await customersApi.list({ active_only: true, per_page: 500 })
       return res.data.data || res.data
     },
+    staleTime: 5 * 60 * 1000,
   })
 
   const { data: products, isLoading: productsLoading } = useQuery({
-    queryKey: ['products', productSearch],
+    queryKey: ['products-all'],
     queryFn: async () => {
-      const params: any = {}
-      if (productSearch) params.search = productSearch
-      const res = await productsApi.list(params)
+      const res = await productsApi.list({ per_page: 500 })
       return res.data.data || res.data
     },
+    staleTime: 5 * 60 * 1000,
   })
 
   const { data: suppliers } = useQuery({
-    queryKey: ['suppliers', supplierSearch],
+    queryKey: ['suppliers-all'],
     queryFn: async () => {
-      const params: any = { active_only: true }
-      if (supplierSearch) params.search = supplierSearch
-      const res = await suppliersApi.list(params)
+      const res = await suppliersApi.list({ active_only: true, per_page: 500 })
       return res.data.data || res.data
     },
+    staleTime: 5 * 60 * 1000,
   })
+
+  const customerOptions = useMemo(() =>
+    (customers || []).map((c: Customer) => ({ value: c.id.toString(), label: c.name })),
+    [customers]
+  )
+
+  const productOptions = useMemo(() =>
+    (products || []).map((p: Product) => ({ value: p.id.toString(), label: p.name })),
+    [products]
+  )
+
+  const supplierOptions = useMemo(() =>
+    (suppliers || []).map((s: Supplier) => ({ value: s.id.toString(), label: s.name })),
+    [suppliers]
+  )
 
   const createMutation = useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
@@ -282,22 +289,14 @@ export default function CreateInvoicePage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>العميل *</Label>
-                  <Select value={customerId} onValueChange={setCustomerId}>
-                    <SelectTrigger><SelectValue placeholder="اختر العميل" /></SelectTrigger>
-                    <SelectContent>
-                      <div className="px-2 pb-2">
-                        <Input
-                          placeholder="ابحث عن عميل..."
-                          value={customerSearch}
-                          onChange={(e) => setCustomerSearch(e.target.value)}
-                          className="h-8"
-                        />
-                      </div>
-                      {customers?.map((c: Customer) => (
-                        <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={customerId}
+                    onValueChange={setCustomerId}
+                    options={customerOptions}
+                    placeholder="اختر العميل"
+                    searchPlaceholder="ابحث عن عميل..."
+                    isLoading={customersLoading}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>تاريخ التسليم</Label>
@@ -348,22 +347,14 @@ export default function CreateInvoicePage() {
                       <div className="grid gap-4 sm:grid-cols-4">
                         <div className="sm:col-span-2 space-y-2">
                           <Label>المنتج</Label>
-                          <Select value={item.product_id || ''} onValueChange={(v) => selectProduct(item.id, v)}>
-                            <SelectTrigger><SelectValue placeholder="اختر المنتج" /></SelectTrigger>
-                            <SelectContent>
-                              <div className="px-2 pb-2">
-                                <Input
-                                  placeholder="ابحث عن منتج..."
-                                  value={productSearch}
-                                  onChange={(e) => setProductSearch(e.target.value)}
-                                  className="h-8"
-                                />
-                              </div>
-                              {products?.map((p: Product) => (
-                                <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <SearchableSelect
+                            value={item.product_id || ''}
+                            onValueChange={(v) => selectProduct(item.id, v)}
+                            options={productOptions}
+                            placeholder="اختر المنتج"
+                            searchPlaceholder="ابحث عن منتج..."
+                            isLoading={productsLoading}
+                          />
                         </div>
                         <div className="space-y-2">
                           <Label>الكمية</Label>
@@ -391,22 +382,14 @@ export default function CreateInvoicePage() {
                           <div key={cost.id} className="flex items-end gap-2 mb-2">
                             <div className="flex-1 space-y-1">
                               <Label className="text-xs">المورد</Label>
-                              <Select value={cost.supplier_id || ''} onValueChange={(v) => updateCost(item.id, cost.id, 'supplier_id', v)}>
-                                <SelectTrigger className="h-9"><SelectValue placeholder="اختر" /></SelectTrigger>
-                                <SelectContent>
-                                  <div className="px-2 pb-2">
-                                    <Input
-                                      placeholder="ابحث عن مورد..."
-                                      value={supplierSearch}
-                                      onChange={(e) => setSupplierSearch(e.target.value)}
-                                      className="h-8"
-                                    />
-                                  </div>
-                                  {suppliers?.map((s: Supplier) => (
-                                    <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                              <SearchableSelect
+                                value={cost.supplier_id || ''}
+                                onValueChange={(v) => updateCost(item.id, cost.id, 'supplier_id', v)}
+                                options={supplierOptions}
+                                placeholder="اختر"
+                                searchPlaceholder="ابحث عن مورد..."
+                                triggerClassName="h-9"
+                              />
                             </div>
                             <div className="flex-1 space-y-1">
                               <Label className="text-xs">النوع</Label>
