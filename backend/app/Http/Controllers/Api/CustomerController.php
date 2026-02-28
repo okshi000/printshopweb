@@ -27,6 +27,11 @@ class CustomerController extends Controller
             $query->active();
         }
 
+        if ($request->boolean('all')) {
+            $customers = $query->orderBy('name')->get();
+            return response()->json($customers);
+        }
+
         $customers = $query->withCount('invoices')
             ->withSum('invoices', 'remaining_amount')
             ->orderBy('name')

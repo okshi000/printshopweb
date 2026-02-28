@@ -27,6 +27,11 @@ class ProductController extends Controller
             $query->active();
         }
 
+        if ($request->boolean('all')) {
+            $products = $query->orderBy('name')->get();
+            return response()->json($products);
+        }
+
         $products = $query->orderBy('name')
             ->paginate($request->per_page ?? 10);
 

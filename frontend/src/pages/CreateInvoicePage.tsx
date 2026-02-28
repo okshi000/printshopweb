@@ -115,7 +115,7 @@ export default function CreateInvoicePage() {
   const { data: customers, isLoading: customersLoading } = useQuery({
     queryKey: ['customers-all'],
     queryFn: async () => {
-      const res = await customersApi.list({ active_only: true, per_page: 500 })
+      const res = await customersApi.list({ active_only: true, all: true })
       return res.data.data || res.data
     },
     staleTime: 5 * 60 * 1000,
@@ -124,7 +124,7 @@ export default function CreateInvoicePage() {
   const { data: products, isLoading: productsLoading } = useQuery({
     queryKey: ['products-all'],
     queryFn: async () => {
-      const res = await productsApi.list({ per_page: 500 })
+      const res = await productsApi.list({ all: true })
       return res.data.data || res.data
     },
     staleTime: 5 * 60 * 1000,
@@ -133,7 +133,7 @@ export default function CreateInvoicePage() {
   const { data: suppliers } = useQuery({
     queryKey: ['suppliers-all'],
     queryFn: async () => {
-      const res = await suppliersApi.list({ active_only: true, per_page: 500 })
+      const res = await suppliersApi.list({ active_only: true, all: true })
       return res.data.data || res.data
     },
     staleTime: 5 * 60 * 1000,

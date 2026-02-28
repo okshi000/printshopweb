@@ -31,6 +31,11 @@ class SupplierController extends Controller
             $query->active();
         }
 
+        if ($request->boolean('all')) {
+            $suppliers = $query->orderBy('name')->get();
+            return response()->json($suppliers);
+        }
+
         $suppliers = $query->orderBy('name')
             ->paginate($request->per_page ?? 10);
 
