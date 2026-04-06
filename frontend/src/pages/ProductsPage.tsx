@@ -166,8 +166,8 @@ export default function ProductsPage() {
       setDeleteConfirmId(null);
       toast.success('تم حذف المنتج بنجاح');
     },
-    onError: () => {
-      toast.error('فشل حذف المنتج');
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'فشل حذف المنتج');
     },
   });
 
