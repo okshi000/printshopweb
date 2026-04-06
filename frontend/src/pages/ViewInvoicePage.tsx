@@ -433,11 +433,22 @@ export default function ViewInvoicePage() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>المبلغ *</Label>
+              <div className="flex items-center justify-between">
+                <Label>المبلغ *</Label>
+                <Button 
+                  type="button" 
+                  variant="link" 
+                  className="h-auto p-0 text-sm h-6" 
+                  onClick={() => setPaymentAmount(invoice.remaining_amount.toString())}
+                >
+                  تسديد كامل المبلغ
+                </Button>
+              </div>
               <Input
                 type="number"
-                min={0}
+                min={0.01}
                 max={invoice.remaining_amount}
+                step="0.01"
                 value={paymentAmount}
                 onChange={(e) => setPaymentAmount(e.target.value)}
                 placeholder={`المتبقي: ${formatCurrency(invoice.remaining_amount)}`}
