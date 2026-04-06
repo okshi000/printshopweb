@@ -23,6 +23,8 @@ import { SearchableSelect } from '@/components/ui/searchable-select'
 import { cn, formatCurrency, fadeInUp, staggerContainer } from '@/lib/utils'
 import { invoicesApi, customersApi, productsApi, suppliersApi } from '../api'
 import type { Customer, Product } from '../types'
+import { QuickAddCustomerDialog } from '@/components/quick-add/QuickAddCustomerDialog'
+import { QuickAddProductDialog } from '@/components/quick-add/QuickAddProductDialog'
 
 // Generate a UUID compatible with all browsers
 const generateUUID = (): string => {
@@ -66,6 +68,9 @@ export default function CreateInvoicePage() {
   const [deliveryDate, setDeliveryDate] = useState<Date | null>(null)
   const [notes, setNotes] = useState('')
   const [isLoadingInvoice, setIsLoadingInvoice] = useState(false)
+
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false)
+  const [productModalItemId, setProductModalItemId] = useState<string | null>(null)
 
   // Set customer from URL parameter if provided
   useEffect(() => {
@@ -289,14 +294,26 @@ export default function CreateInvoicePage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>العميل *</Label>
-                  <SearchableSelect
-                    value={customerId}
-                    onValueChange={setCustomerId}
-                    options={customerOptions}
-                    placeholder="اختر العميل"
-                    searchPlaceholder="ابحث عن عميل..."
-                    isLoading={customersLoading}
-                  />
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <SearchableSelect
+                        value={customerId}
+                        onValueChange={setCustomerId}
+                        options={customerOptions}
+                        placeholder="اختر العميل"
+                        searchPlaceholder="ابحث عن عميل..."
+                        isLoading={customersLoading}
+                      />
+                    </div>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      className="px-3 shrink-0 h-11" 
+                      onClick={() => setIsCustomerModalOpen(true)}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>تاريخ التسليم</Label>
@@ -347,14 +364,26 @@ export default function CreateInvoicePage() {
                       <div className="grid gap-4 sm:grid-cols-4">
                         <div className="sm:col-span-2 space-y-2">
                           <Label>المنتج</Label>
-                          <SearchableSelect
-                            value={item.product_id || ''}
-                            onValueChange={(v) => selectProduct(item.id, v)}
-                            options={productOptions}
-                            placeholder="اختر المنتج"
-                            searchPlaceholder="ابحث عن منتج..."
-                            isLoading={productsLoading}
-                          />
+                          <div className="flex gap-2">
+                            <div className="flex-1">
+                              <SearchableSelect
+                                value={item.product_id || ''}
+                                onValueChange={(v) => selectProduct(item.id, v)}
+                                options={productOptions}
+                                placeholder="اختر المنتج"
+                                searchPlaceholder="ابحث عن منتج..."
+                                isLoading={productsLoading}
+                              />
+                            </div>
+                            <Button 
+                              type="button" 
+                              variant="outline" 
+                              className="px-3 shrink-0 h-11" 
+                              onClick={() => setProductModalItemId(item.id)}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                         <div className="space-y-2">
                           <Label>الكمية</Label>
@@ -455,6 +484,24 @@ export default function CreateInvoicePage() {
           </Card>
         </motion.div>
       </div>
+
+      <QuickAddCustomerDialog 
+        open={isCustomerModalOpen} 
+        onOpenChange={setIsCustomerModalOpen} 
+        onSuccess={(id) => setCustomerId(id)} 
+      />
+
+      <QuickAddProductDialog 
+        open={!!productModalItemId} 
+        onOpenChange={(open) => {
+          if (!open) setProductModalItemId(null)
+        }} 
+        onSuccess={(productId) => {
+          if (productModalItemId) {
+            selectProduct(productModalItemId, productId)
+          }
+        }} 
+      />
     </motion.div>
   )
 }
