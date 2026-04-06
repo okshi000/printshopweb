@@ -86,9 +86,18 @@ class ProductController extends Controller
 
     public function destroy(Product $product): JsonResponse
     {
-        $product->update(['is_active' => false]);
+        if ($product->invoiceItems()->exists()) {
+            return response()->json([
+                'message' => 'لا يمكن حذف هذا المنتج لارتباطه بفواتير سابقة'
+            ], 422);
+        }
 
-        ActivityLog::log('delete', 'products', "حذف المنتج: {$product->name}", $product->id);
+        $productName = $product->name;
+        $productId = $product->id;
+
+        $product->delete();
+
+        ActivityLog::log('delete', 'products', "حذف المنتج: {$productName}", $productId);
 
         return response()->json(['message' => 'تم حذف المنتج بنجاح']);
     }
