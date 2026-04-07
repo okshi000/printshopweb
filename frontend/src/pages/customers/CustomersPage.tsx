@@ -47,6 +47,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { customersApi } from '../../api';
 import type { Customer, PaginatedResponse } from '../../types';
@@ -58,6 +59,7 @@ const customerSchema = z.object({
   phone2: z.string().optional(),
   address: z.string().optional(),
   notes: z.string().optional(),
+  is_active: z.boolean().optional(),
 });
 
 type CustomerFormData = z.infer<typeof customerSchema>;
@@ -90,6 +92,7 @@ export default function CustomersPage() {
       phone2: '',
       address: '',
       notes: '',
+      is_active: true,
     },
   });
 
@@ -141,6 +144,7 @@ export default function CustomersPage() {
       phone2: customer.phone2 || '',
       address: customer.address || '',
       notes: customer.notes || '',
+      is_active: customer.is_active,
     });
     setModalOpen(true);
   };
@@ -477,6 +481,16 @@ export default function CustomersPage() {
                 {...form.register('notes')}
               />
             </div>
+            {selectedCustomer && (
+              <div className="flex items-center space-x-2 space-x-reverse">
+                <Switch
+                  id="is_active"
+                  checked={form.watch('is_active')}
+                  onCheckedChange={(checked) => form.setValue('is_active', checked)}
+                />
+                <Label htmlFor="is_active">حالة العميل (نشط / غير نشط)</Label>
+              </div>
+            )}
             <DialogFooter className="gap-2">
               <Button type="button" variant="outline" onClick={handleCloseModal}>
                 إلغاء
