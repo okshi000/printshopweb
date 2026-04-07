@@ -16,7 +16,6 @@ import CreateInvoicePage from './pages/CreateInvoicePage';
 import ViewInvoicePage from './pages/ViewInvoicePage';
 import PrintInvoicePage from './pages/PrintInvoicePage';
 import ExpensesPage from './pages/ExpensesPage';
-
 import CashPage from './pages/CashPage';
 import DebtsPage from './pages/DebtsPage';
 import ActivityPage from './pages/ActivityPage';
@@ -75,9 +74,7 @@ function App() {
                   <Route path="invoices/:id/edit" element={<CreateInvoicePage />} />
                   <Route path="invoices/:id/print" element={<PrintInvoicePage />} />
                   <Route path="cash" element={<CashPage />} />
-                  <Route path="expenses" element={<ExpensesPage />} />
-                  
-                  <Route path="inventory" element={<InventoryPage />} />
+                  <Route path="expenses" element={<ExpensesPage />} />                  <Route path="inventory" element={<InventoryPage />} />
                   <Route path="debts" element={<DebtsPage />} />
                   <Route path="reports" element={<ReportsOverview />} />
                   <Route path="reports/financial" element={<FinancialReports />} />

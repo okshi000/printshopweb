@@ -60,27 +60,27 @@ interface NavSection {
 
 const navSections: NavSection[] = [
   {
-    title: '????????',
+    title: 'الرئيسية',
     items: [
-      { icon: LayoutDashboard, label: '???? ??????', to: '/' },
-      { icon: FileText, label: '????????', to: '/invoices' },
-      { icon: Plus, label: '?????? ?????', to: '/invoices/create', color: 'success' },
+      { icon: LayoutDashboard, label: 'لوحة التحكم', to: '/' },
+      { icon: FileText, label: 'الفواتير', to: '/invoices' },
+      { icon: Plus, label: 'فاتورة جديدة', to: '/invoices/create', color: 'success' },
     ],
   },
   {
-    title: '???????',
+    title: 'الإدارة',
     items: [
-      { icon: Users, label: '???????', to: '/customers' },
-      { icon: Truck, label: '???????? / ???????', to: '/suppliers' },
-      { icon: Package, label: '????????', to: '/products' },
+      { icon: Users, label: 'العملاء', to: '/customers' },
+      { icon: Truck, label: 'الموردين / المطابع', to: '/suppliers' },
+      { icon: Package, label: 'المنتجات', to: '/products' },
     ],
   },
   {
-    title: '??????? ?????',
+    title: 'المحاسب الآلي',
     items: [
       { 
         icon: Calculator, 
-        label: '??????? ?????', 
+        label: 'المحاسب الآلي', 
         to: '/accountant', 
         color: 'warning',
         special: true 
@@ -88,26 +88,25 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    title: '???????',
+    title: 'المالية',
     items: [
-      { icon: Wallet, label: '??????', to: '/cash' },
-      { icon: Receipt, label: '?????????', to: '/expenses' },
-
-      { icon: Coins, label: '??????? ????? ?????????', to: '/debts' },
+      { icon: Wallet, label: 'الخزنة', to: '/cash' },
+      { icon: Receipt, label: 'المصروفات', to: '/expenses' },
+      { icon: Coins, label: 'الديون، السلف والسحوبات', to: '/debts' },
     ],
   },
   {
-    title: '????',
+    title: 'أخرى',
     items: [
-      { icon: Warehouse, label: '???????', to: '/inventory' },
-      { icon: BarChart3, label: '????????', to: '/reports' },
+      { icon: Warehouse, label: 'المخزون', to: '/inventory' },
+      { icon: BarChart3, label: 'التقارير', to: '/reports' },
     ],
   },
   {
-    title: '?????????',
+    title: 'الإعدادات',
     items: [
-      { icon: UserCog, label: '?????????? ??????????', to: '/users' },
-      { icon: History, label: '??? ??????', to: '/activity' },
+      { icon: UserCog, label: 'المستخدمين والصلاحيات', to: '/users' },
+      { icon: History, label: 'سجل النشاط', to: '/activity' },
     ],
   },
 ];
@@ -207,7 +206,7 @@ export default function MainLayout() {
               exit={{ opacity: 0, x: -10 }}
               className="text-lg font-bold text-gradient"
             >
-              ???? ???????
+              نظام المطبعة
             </motion.h1>
           )}
         </AnimatePresence>
@@ -281,11 +280,11 @@ export default function MainLayout() {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>?????</DropdownMenuLabel>
+            <DropdownMenuLabel>حسابي</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
               <LogOut className="ml-2 h-4 w-4" />
-              ????? ??????
+              تسجيل الخروج
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -380,7 +379,7 @@ export default function MainLayout() {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
                   <LogOut className="ml-2 h-4 w-4" />
-                  ????? ??????
+                  تسجيل الخروج
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
