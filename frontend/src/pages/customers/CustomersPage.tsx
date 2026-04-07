@@ -104,8 +104,10 @@ export default function CustomersPage() {
       setModalOpen(false);
       form.reset();
     },
-    onError: () => {
-      toast.error('حدث خطأ أثناء إضافة العميل');
+    onError: (error: any) => {
+      const errors = error.response?.data?.errors;
+      const message = errors ? Object.values(errors).flat()[0] : (error.response?.data?.message || 'حدث خطأ أثناء إضافة العميل');
+      toast.error(message as string);
     },
   });
 
@@ -119,8 +121,10 @@ export default function CustomersPage() {
       setSelectedCustomer(null);
       form.reset();
     },
-    onError: () => {
-      toast.error('حدث خطأ أثناء تعديل العميل');
+    onError: (error: any) => {
+      const errors = error.response?.data?.errors;
+      const message = errors ? Object.values(errors).flat()[0] : (error.response?.data?.message || 'حدث خطأ أثناء تعديل العميل');
+      toast.error(message as string);
     },
   });
 
@@ -131,8 +135,9 @@ export default function CustomersPage() {
       toast.success('تم حذف العميل بنجاح');
       setDeleteConfirmId(null);
     },
-    onError: () => {
-      toast.error('حدث خطأ أثناء حذف العميل');
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'حدث خطأ أثناء حذف العميل';
+      toast.error(message);
     },
   });
 
