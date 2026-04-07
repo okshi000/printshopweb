@@ -829,6 +829,14 @@ export default function DebtsPage() {
                 max={parseFloat(String(selectedDebt?.amount || 0)) - parseFloat(String(selectedDebt?.paid_amount || 0))} 
                 step="0.01" 
                 {...repayForm.register('amount')} 
+                onChange={(e) => {
+                  repayForm.register('amount').onChange(e);
+                  let val = parseFloat(e.target.value);
+                  const maxVal = parseFloat(String(selectedDebt?.amount || 0)) - parseFloat(String(selectedDebt?.paid_amount || 0));
+                  if (!isNaN(val) && val > maxVal) {
+                    repayForm.setValue('amount', maxVal);
+                  }
+                }}
               />
             </div>
             <div className="space-y-2">

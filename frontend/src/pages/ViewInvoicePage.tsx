@@ -450,7 +450,13 @@ export default function ViewInvoicePage() {
                 max={invoice.remaining_amount}
                 step="0.01"
                 value={paymentAmount}
-                onChange={(e) => setPaymentAmount(e.target.value)}
+                onChange={(e) => {
+                  let val = e.target.value;
+                  if (val && !isNaN(parseFloat(val)) && parseFloat(val) > invoice.remaining_amount) {
+                    val = invoice.remaining_amount.toString();
+                  }
+                  setPaymentAmount(val);
+                }}
                 placeholder={`المتبقي: ${formatCurrency(invoice.remaining_amount)}`}
               />
             </div>

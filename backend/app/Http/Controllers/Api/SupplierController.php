@@ -133,10 +133,14 @@ class SupplierController extends Controller
 
     public function addPayment(Request $request, Supplier $supplier): JsonResponse
     {
+        $remainingAmount = max(0, $supplier->total_debt);
+        
         $validated = $request->validate([
-            'amount' => 'required|numeric|min:0.01',
+            'amount' => 'required|numeric|min:0.01|max:' . max($remainingAmount, 0.01),
             'payment_method' => 'required|in:cash,bank',
             'notes' => 'nullable|string',
+        ], [
+            'amount.max' => 'قيمة الدفعة يجب ألا تتجاوز المستحق للمورد (' . number_format($remainingAmount, 2) . ')'
         ]);
 
         $payment = $supplier->payments()->create($validated);

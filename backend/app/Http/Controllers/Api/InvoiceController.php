@@ -271,12 +271,16 @@ class InvoiceController extends Controller
 
     public function addPayment(Request $request, Invoice $invoice): JsonResponse
     {
+        $remainingAmount = $invoice->total - $invoice->payments()->sum('amount');
+        
         $validated = $request->validate([
-            'amount' => 'required|numeric|min:0.01',
+            'amount' => 'required|numeric|min:0.01|max:' . max($remainingAmount, 0.01),
             'payment_method' => 'required|in:cash,bank',
             'payment_type' => 'required|in:deposit,partial,full',
             'payment_date' => 'nullable|date',
             'notes' => 'nullable|string',
+        ], [
+            'amount.max' => 'قيمة الدفعة يجب ألا تتجاوز القيمة المتبقية من الفاتورة (' . number_format($remainingAmount, 2) . ')'
         ]);
 
         // Set payment_date to current time if not provided

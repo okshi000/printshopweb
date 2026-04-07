@@ -397,7 +397,13 @@ export default function SupplierViewPage() {
                 max={supplier.remaining_amount}
                 step="0.01"
                 value={paymentAmount}
-                onChange={(e) => setPaymentAmount(e.target.value)}
+                onChange={(e) => {
+                  let val = e.target.value;
+                  if (val && !isNaN(parseFloat(val)) && parseFloat(val) > supplier.remaining_amount) {
+                    val = supplier.remaining_amount.toString();
+                  }
+                  setPaymentAmount(val);
+                }}
                 placeholder={`المستحق: ${formatCurrency(supplier.remaining_amount)}`}
               />
             </div>
