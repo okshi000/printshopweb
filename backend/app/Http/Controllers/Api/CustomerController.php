@@ -43,11 +43,13 @@ class CustomerController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:100',
+            'name' => 'required|string|max:100|unique:customers,name',
             'phone' => 'nullable|string|max:20',
             'phone2' => 'nullable|string|max:20',
             'address' => 'nullable|string',
             'notes' => 'nullable|string',
+        ], [
+            'name.unique' => 'اسم العميل هذا مسجل مسبقاً، يرجى اختيار اسم آخر.'
         ]);
 
         $customer = Customer::create($validated);
@@ -82,12 +84,14 @@ class CustomerController extends Controller
     public function update(Request $request, Customer $customer): JsonResponse
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:100',
+            'name' => 'required|string|max:100|unique:customers,name,' . $customer->id,
             'phone' => 'nullable|string|max:20',
             'phone2' => 'nullable|string|max:20',
             'address' => 'nullable|string',
             'notes' => 'nullable|string',
             'is_active' => 'boolean',
+        ], [
+            'name.unique' => 'اسم العميل هذا مسجل مسبقاً، يرجى اختيار اسم آخر.'
         ]);
 
         $oldValues = $customer->toArray();

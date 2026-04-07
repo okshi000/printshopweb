@@ -41,10 +41,12 @@ class ProductController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:100',
+            'name' => 'required|string|max:100|unique:products,name',
             'category_id' => 'nullable|exists:categories,id',
             'description' => 'nullable|string',
             'default_price' => 'nullable|numeric|min:0',
+        ], [
+            'name.unique' => 'اسم المنتج هذا مسجل مسبقاً، يرجى اختيار اسم آخر.'
         ]);
 
         $product = Product::create($validated);
@@ -62,11 +64,13 @@ class ProductController extends Controller
     public function update(Request $request, Product $product): JsonResponse
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:100',
+            'name' => 'required|string|max:100|unique:products,name,' . $product->id,
             'category_id' => 'nullable|exists:categories,id',
             'description' => 'nullable|string',
             'default_price' => 'nullable|numeric|min:0',
             'is_active' => 'boolean',
+        ], [
+            'name.unique' => 'اسم المنتج هذا مسجل مسبقاً، يرجى اختيار اسم آخر.'
         ]);
 
         $oldValues = $product->toArray();
