@@ -147,8 +147,9 @@ export default function SuppliersPage() {
       form.reset();
       toast.success('تم إضافة المورد بنجاح');
     },
-    onError: () => {
-      toast.error('فشل إضافة المورد');
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'فشل إضافة المورد';
+      toast.error(message);
     },
   });
 
@@ -161,8 +162,9 @@ export default function SuppliersPage() {
       form.reset();
       toast.success('تم تحديث المورد بنجاح');
     },
-    onError: () => {
-      toast.error('فشل تحديث المورد');
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'فشل تحديث المورد';
+      toast.error(message);
     },
   });
 
@@ -204,6 +206,7 @@ export default function SuppliersPage() {
     setEditingSupplier(supplier);
     form.reset({
       name: supplier.name,
+      type: supplier.type || 'other',
       phone: supplier.phone || '',
       email: supplier.email || '',
       address: supplier.address || '',
