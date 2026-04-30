@@ -51,6 +51,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Invoices
     Route::apiResource('invoices', InvoiceController::class);
     Route::patch('/invoices/{invoice}/status', [InvoiceController::class, 'updateStatus']);
+    Route::patch('/invoices/{invoice}/finalize', [InvoiceController::class, 'finalize']);
     Route::post('/invoices/{invoice}/payments', [InvoiceController::class, 'addPayment']);
     Route::get('/invoices-statistics', [InvoiceController::class, 'statistics']);
 

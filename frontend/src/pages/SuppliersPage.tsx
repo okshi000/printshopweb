@@ -87,6 +87,8 @@ export default function SuppliersPage() {
   const { hasPermission } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState('name');
+  const [sortDir, setSortDir] = useState('asc');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -107,9 +109,11 @@ export default function SuppliersPage() {
   };
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['suppliers', page, debouncedSearch],
+    queryKey: ['suppliers', page, debouncedSearch, sortBy, sortDir],
     queryFn: async () => {
       const params: Record<string, string | number> = { page, per_page: 10 };
+      params.sort_by = sortBy;
+      params.sort_dir = sortDir;
       if (debouncedSearch) params.search = debouncedSearch;
       const res = await suppliersApi.list(params);
       return res.data;
@@ -269,18 +273,33 @@ export default function SuppliersPage() {
 
       {/* Search */}
       <Card className="shadow-soft">
-        <CardContent className="p-4">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="بحث عن مورد..."
-              value={search}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="w-full pr-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">🔍</span>
-          </div>
-        </CardContent>
+        <CardContent className="p-4 flex flex-col sm:flex-row gap-2">
+            <Select value={`${sortBy}-${sortDir}`} onValueChange={(val) => {
+              const [by, dir] = val.split('-');
+              setSortBy(by);
+              setSortDir(dir);
+            }}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="ترتيب حسب" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name-asc">الاسم (أ-ي)</SelectItem>
+                <SelectItem value="name-desc">الاسم (ي-أ)</SelectItem>
+                <SelectItem value="balance-desc">الأكثر ديناً (مالاً)</SelectItem>
+                <SelectItem value="balance-asc">الأقل ديناً</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="relative w-full sm:w-80">
+              <input
+                type="text"
+                placeholder="بحث عن مورد..."
+                value={search}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="w-full pr-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">🔍</span>
+            </div>
+          </CardContent>
       </Card>
 
       {/* Main Content */}

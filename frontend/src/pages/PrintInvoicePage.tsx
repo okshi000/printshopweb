@@ -52,6 +52,7 @@ interface Invoice {
   customer_phone?: string
   customer_address?: string
   phone?: string
+  is_preliminary?: boolean
   status: string
   subtotal: number
   discount: number
@@ -250,6 +251,7 @@ const PrintableInvoice = ({ invoice }: PrintableInvoiceProps) => {
         <div style={styles.infoBox}>
           <h3 style={styles.infoBoxTitle}>بيانات الفاتورة</h3>
           <p><strong>رقم الفاتورة:</strong> {invoice.invoice_number}</p>
+          <p><strong>النوع:</strong> {invoice.is_preliminary ? 'فاتورة مبدئية' : 'فاتورة نهائية'}</p>
           <p><strong>التاريخ:</strong> {formatDate(invoice.invoice_date || invoice.created_at, 'dd MMMM yyyy', { locale: ar })}</p>
           {invoice.delivery_date && (
             <p><strong>تاريخ التسليم:</strong> {formatDate(invoice.delivery_date, 'dd MMMM yyyy', { locale: ar })}</p>

@@ -396,7 +396,12 @@ export default function InvoicesPage() {
                               <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-500/10 flex items-center justify-center">
                                 <FileText className="h-5 w-5 text-blue-500" />
                               </div>
-                              <span className="font-mono font-medium">{invoice.invoice_number}</span>
+                              <div className="flex flex-col">
+                                <span className="font-mono font-medium">{invoice.invoice_number}</span>
+                                {invoice.is_preliminary && (
+                                  <span className="text-xs text-muted-foreground">مبدئية</span>
+                                )}
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell>

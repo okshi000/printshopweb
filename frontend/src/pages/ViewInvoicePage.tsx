@@ -70,6 +70,7 @@ interface Invoice {
   customer_id: number
   customer_name: string
   customer_phone?: string
+  is_preliminary?: boolean
   status: string
   total_amount: number
   paid_amount: number
@@ -140,6 +141,15 @@ export default function ViewInvoicePage() {
     onError: (error: any) => toast.error(error.response?.data?.message || 'فشل تحديث الحالة'),
   })
 
+  const finalizeMutation = useMutation({
+    mutationFn: async () => invoicesApi.finalize(Number(id)),
+    onSuccess: () => {
+      toast.success('تم تحويل الفاتورة إلى نهائية')
+      queryClient.invalidateQueries({ queryKey: ['invoice', id] })
+    },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'فشل تحويل الفاتورة'),
+  })
+
   const deleteMutation = useMutation({
     mutationFn: async () => invoicesApi.delete(Number(id)),
     onSuccess: () => {
@@ -199,11 +209,26 @@ export default function ViewInvoicePage() {
         </div>
         <div className="flex items-center gap-2">
           <Badge className={cn('gap-1', status.color)}>{status.icon}{status.label}</Badge>
+          {invoice.is_preliminary && (
+            <Badge variant="secondary">مبدئية</Badge>
+          )}
           <Link to={`/invoices/${id}/print`}>
             <Button variant="outline" size="sm" className="gap-1">
               <Printer className="h-4 w-4" /> طباعة
             </Button>
           </Link>
+          {invoice.is_preliminary && (
+            <Button
+              variant="default"
+              size="sm"
+              className="gap-1"
+              onClick={() => finalizeMutation.mutate()}
+              disabled={finalizeMutation.isPending}
+            >
+              {finalizeMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              تحويل إلى نهائية
+            </Button>
+          )}
           <Link to={`/invoices/${id}/edit`}>
             <Button variant="outline" size="sm" className="gap-1">
               <Edit className="h-4 w-4" /> تعديل

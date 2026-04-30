@@ -19,6 +19,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Switch } from '@/components/ui/switch'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { cn, formatCurrency, fadeInUp, staggerContainer } from '@/lib/utils'
 import { invoicesApi, customersApi, productsApi, suppliersApi } from '../api'
@@ -67,6 +68,7 @@ export default function CreateInvoicePage() {
   const [customerId, setCustomerId] = useState<string>('')
   const [deliveryDate, setDeliveryDate] = useState<Date | null>(null)
   const [notes, setNotes] = useState('')
+  const [isPreliminary, setIsPreliminary] = useState(false)
   const [isLoadingInvoice, setIsLoadingInvoice] = useState(false)
 
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false)
@@ -90,6 +92,7 @@ export default function CreateInvoicePage() {
           setCustomerId(invoice.customer_id?.toString() || '')
           setDeliveryDate(invoice.delivery_date ? new Date(invoice.delivery_date) : null)
           setNotes(invoice.notes || '')
+          setIsPreliminary(!!invoice.is_preliminary)
           
           // Convert invoice items to form format
           const formItems: InvoiceItem[] = invoice.items.map((item: any) => ({
@@ -238,7 +241,7 @@ export default function CreateInvoicePage() {
       return
     }
 
-    const data = {
+    const data: Record<string, unknown> = {
       customer_id: parseInt(customerId),
       delivery_date: deliveryDate ? format(deliveryDate, 'yyyy-MM-dd') : null,
       notes,
@@ -253,6 +256,10 @@ export default function CreateInvoicePage() {
           amount: c.amount,
         })),
       })),
+    }
+
+    if (!isEditMode) {
+      data.is_preliminary = isPreliminary
     }
     createMutation.mutate(data)
   }
@@ -330,6 +337,21 @@ export default function CreateInvoicePage() {
                   </Popover>
                 </div>
               </div>
+
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="space-y-0.5">
+                  <Label>فاتورة مبدئية</Label>
+                  <p className="text-xs text-muted-foreground">يمكن تحويلها لاحقاً إلى فاتورة نهائية</p>
+                </div>
+                {isEditMode ? (
+                  <Badge variant={isPreliminary ? 'secondary' : 'outline'}>
+                    {isPreliminary ? 'مبدئية' : 'نهائية'}
+                  </Badge>
+                ) : (
+                  <Switch checked={isPreliminary} onCheckedChange={setIsPreliminary} />
+                )}
+              </div>
+
               <div className="space-y-2">
                 <Label>ملاحظات</Label>
                 <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="ملاحظات على الفاتورة" />
