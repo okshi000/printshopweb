@@ -14,8 +14,11 @@ import {
   Filter,
   AlertCircle,
   Receipt,
+  Download,
   X,
 } from 'lucide-react';
+import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -64,6 +67,7 @@ export default function InvoicesPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Debounce search
   const handleSearchChange = (value: string) => {
@@ -124,6 +128,110 @@ export default function InvoicesPage() {
 
   const hasActiveFilters = invoiceStatusFilter || paymentStatusFilter || dateFrom || dateTo || searchTerm;
 
+  const exportHeaders = [
+    'رقم الفاتورة',
+    'العميل',
+    'التاريخ',
+    'الإجمالي',
+    'المدفوع',
+    'المتبقي',
+    'حالة الفاتورة',
+    'حالة الدفع',
+  ];
+
+  const buildExportParams = (targetPage: number) => {
+    const params: Record<string, string | number> = { page: targetPage, per_page: 200 };
+    if (invoiceStatusFilter) params.status = invoiceStatusFilter;
+    if (debouncedSearch) params.search = debouncedSearch;
+    if (dateFrom) params.date_from = dateFrom.toISOString().split('T')[0];
+    if (dateTo) params.date_to = dateTo.toISOString().split('T')[0];
+    return params;
+  };
+
+  const fetchAllInvoices = async (): Promise<Invoice[]> => {
+    const firstRes = await invoicesApi.list(buildExportParams(1));
+    const firstPage = firstRes.data;
+    const invoices = firstPage?.data || [];
+    const lastPage = firstPage?.last_page || 1;
+
+    if (lastPage <= 1) return invoices;
+
+    const pages = Array.from({ length: lastPage - 1 }, (_, index) => index + 2);
+    const responses = await Promise.all(
+      pages.map((pageNumber) => invoicesApi.list(buildExportParams(pageNumber)))
+    );
+    const moreInvoices = responses.flatMap((res) => res.data?.data || []);
+    return [...invoices, ...moreInvoices];
+  };
+
+  const handleExportExcel = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+
+    try {
+      const allInvoices = await fetchAllInvoices();
+      const paymentFiltered = paymentStatusFilter
+        ? allInvoices.filter((invoice) => {
+            const total = parseFloat(String(invoice.total || 0));
+            const paid = parseFloat(String(invoice.paid_amount || 0));
+            return getPaymentStatus(total, paid) === paymentStatusFilter;
+          })
+        : allInvoices;
+
+      if (paymentFiltered.length === 0) {
+        toast.info('لا توجد فواتير للتصدير');
+        return;
+      }
+
+      const rows = paymentFiltered.map((invoice) => {
+        const total = parseFloat(String(invoice.total || 0));
+        const paid = parseFloat(String(invoice.paid_amount || 0));
+        const remaining = total - paid;
+        const paymentStatus = getPaymentStatus(total, paid);
+
+        return {
+          'رقم الفاتورة': invoice.invoice_number,
+          'العميل': invoice.customer?.name || 'عميل نقدي',
+          'التاريخ': formatDate(invoice.invoice_date || invoice.created_at),
+          'الإجمالي': total,
+          'المدفوع': paid,
+          'المتبقي': remaining,
+          'حالة الفاتورة': getStatusLabel(invoice.status),
+          'حالة الدفع': getPaymentStatusLabel(paymentStatus),
+        };
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(rows, { header: exportHeaders });
+      worksheet['!cols'] = [
+        { wch: 18 },
+        { wch: 22 },
+        { wch: 18 },
+        { wch: 12 },
+        { wch: 12 },
+        { wch: 12 },
+        { wch: 18 },
+        { wch: 18 },
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'الفواتير');
+
+      const timestamp = new Date()
+        .toISOString()
+        .replace(/:/g, '-')
+        .replace('T', '_')
+        .slice(0, 16);
+
+      XLSX.writeFile(workbook, `invoices_${timestamp}.xlsx`);
+      toast.success('تم تصدير الفواتير بنجاح');
+    } catch (error) {
+      console.error(error);
+      toast.error('فشل تصدير الفواتير');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -154,15 +262,26 @@ export default function InvoicesPage() {
             إدارة الفواتير والمدفوعات
           </p>
         </div>
-        {hasPermission('create invoices') && (
+        <div className="flex flex-wrap items-center gap-2">
           <Button
-            onClick={() => navigate('/invoices/create')}
-            className="gap-2 shadow-lg shadow-blue-500/25"
+            variant="outline"
+            onClick={handleExportExcel}
+            disabled={isExporting}
+            className="gap-2"
           >
-            <Plus className="h-4 w-4" />
-            إنشاء فاتورة
+            <Download className="h-4 w-4" />
+            {isExporting ? 'جاري التصدير...' : 'تصدير Excel'}
           </Button>
-        )}
+          {hasPermission('create invoices') && (
+            <Button
+              onClick={() => navigate('/invoices/create')}
+              className="gap-2 shadow-lg shadow-blue-500/25"
+            >
+              <Plus className="h-4 w-4" />
+              إنشاء فاتورة
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Statistics Cards */}
@@ -396,12 +515,7 @@ export default function InvoicesPage() {
                               <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-500/10 flex items-center justify-center">
                                 <FileText className="h-5 w-5 text-blue-500" />
                               </div>
-                              <div className="flex flex-col">
-                                <span className="font-mono font-medium">{invoice.invoice_number}</span>
-                                {invoice.is_preliminary && (
-                                  <span className="text-xs text-muted-foreground">مبدئية</span>
-                                )}
-                              </div>
+                              <span className="font-mono font-medium">{invoice.invoice_number}</span>
                             </div>
                           </TableCell>
                           <TableCell>
