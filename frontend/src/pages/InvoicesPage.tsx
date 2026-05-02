@@ -142,6 +142,20 @@ export default function InvoicesPage() {
     'سعر الوحدة',
   ];
 
+  type InvoiceExportRow = {
+    'رقم الفاتورة': string;
+    'العميل': string;
+    'التاريخ': string;
+    'الإجمالي': number | null;
+    'المدفوع': number | null;
+    'المتبقي': number | null;
+    'حالة الفاتورة': string;
+    'حالة الدفع': string;
+    'المنتج': string;
+    'الكمية': number | null;
+    'سعر الوحدة': number | null;
+  };
+
   const buildExportParams = (targetPage: number) => {
     const params: Record<string, string | number> = { page: targetPage, per_page: 200 };
     if (invoiceStatusFilter) params.status = invoiceStatusFilter;
@@ -201,7 +215,7 @@ export default function InvoicesPage() {
         return;
       }
 
-      const rows = paymentFiltered.flatMap((invoice) => {
+      const rows: InvoiceExportRow[] = paymentFiltered.flatMap((invoice) => {
         const total = parseFloat(String(invoice.total || 0));
         const paid = parseFloat(String(invoice.paid_amount || 0));
         const remaining = total - paid;
@@ -221,8 +235,8 @@ export default function InvoicesPage() {
               'حالة الفاتورة': getStatusLabel(invoice.status),
               'حالة الدفع': getPaymentStatusLabel(paymentStatus),
               'المنتج': '',
-              'الكمية': '',
-              'سعر الوحدة': '',
+              'الكمية': null,
+              'سعر الوحدة': null,
             },
           ];
         }
@@ -236,9 +250,9 @@ export default function InvoicesPage() {
             'رقم الفاتورة': index === 0 ? invoice.invoice_number : '',
             'العميل': index === 0 ? (invoice.customer?.name || 'عميل نقدي') : '',
             'التاريخ': index === 0 ? invoiceDate : '',
-            'الإجمالي': index === 0 ? total : '',
-            'المدفوع': index === 0 ? paid : '',
-            'المتبقي': index === 0 ? remaining : '',
+            'الإجمالي': index === 0 ? total : null,
+            'المدفوع': index === 0 ? paid : null,
+            'المتبقي': index === 0 ? remaining : null,
             'حالة الفاتورة': index === 0 ? getStatusLabel(invoice.status) : '',
             'حالة الدفع': index === 0 ? getPaymentStatusLabel(paymentStatus) : '',
             'المنتج': productName,
