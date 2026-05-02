@@ -167,24 +167,14 @@ export default function InvoicesPage() {
     return [...invoices, ...moreInvoices];
   };
 
-  const fetchInvoiceDetails = async (invoiceId: number): Promise<Invoice> => {
-    const res = await invoicesApi.getById(invoiceId);
-    return res.data?.data || res.data;
-  };
-
-  const fetchInvoiceDetailsBatch = async (invoices: Invoice[]): Promise<Invoice[]> => {
-    const results: Invoice[] = [];
-    const batchSize = 5;
-
-    for (let i = 0; i < invoices.length; i += batchSize) {
-      const batch = invoices.slice(i, i + batchSize);
-      const batchResults = await Promise.all(
-        batch.map((invoice) => fetchInvoiceDetails(invoice.id))
-      );
-      results.push(...batchResults);
+  const fetchInvoiceDetails = async (invoiceId: number): Promise<Invoice | null> => {
+    try {
+      const res = await invoicesApi.getById(invoiceId);
+      return res.data?.data || res.data;
+    } catch (error) {
+      console.warn('Failed to fetch invoice details', invoiceId, error);
+      return null;
     }
-
-    return results;
   };
 
   const handleExportExcel = async () => {
@@ -193,41 +183,69 @@ export default function InvoicesPage() {
 
     try {
       const allInvoices = await fetchAllInvoices();
+      const detailResponses = await Promise.all(
+        allInvoices.map((invoice) => fetchInvoiceDetails(invoice.id))
+      );
+      const detailedInvoices = detailResponses.map((detail, index) => detail || allInvoices[index]);
+
       const paymentFiltered = paymentStatusFilter
-        ? allInvoices.filter((invoice) => {
+        ? detailedInvoices.filter((invoice) => {
             const total = parseFloat(String(invoice.total || 0));
             const paid = parseFloat(String(invoice.paid_amount || 0));
             return getPaymentStatus(total, paid) === paymentStatusFilter;
           })
-        : allInvoices;
+        : detailedInvoices;
 
       if (paymentFiltered.length === 0) {
         toast.info('لا توجد فواتير للتصدير');
         return;
       }
 
-      const detailedInvoices = await fetchInvoiceDetailsBatch(paymentFiltered);
-      const rows = detailedInvoices.flatMap((invoice) => {
+      const rows = paymentFiltered.flatMap((invoice) => {
         const total = parseFloat(String(invoice.total || 0));
         const paid = parseFloat(String(invoice.paid_amount || 0));
         const remaining = total - paid;
         const paymentStatus = getPaymentStatus(total, paid);
-        const invoiceDate = invoice.invoice_date || invoice.created_at;
-        const items = invoice.items && invoice.items.length > 0 ? invoice.items : [undefined];
+        const invoiceDate = formatDate(invoice.invoice_date || invoice.created_at);
+        const items = invoice.items || [];
 
-        return items.map((item) => ({
-          'رقم الفاتورة': invoice.invoice_number,
-          'العميل': invoice.customer?.name || 'عميل نقدي',
-          'التاريخ': invoiceDate ? formatDate(invoiceDate) : '',
-          'الإجمالي': total,
-          'المدفوع': paid,
-          'المتبقي': remaining,
-          'حالة الفاتورة': getStatusLabel(invoice.status),
-          'حالة الدفع': getPaymentStatusLabel(paymentStatus),
-          'المنتج': item?.product_name || item?.product?.name || '',
-          'الكمية': item?.quantity ?? '',
-          'سعر الوحدة': item?.unit_price ?? '',
-        }));
+        if (items.length === 0) {
+          return [
+            {
+              'رقم الفاتورة': invoice.invoice_number,
+              'العميل': invoice.customer?.name || 'عميل نقدي',
+              'التاريخ': invoiceDate,
+              'الإجمالي': total,
+              'المدفوع': paid,
+              'المتبقي': remaining,
+              'حالة الفاتورة': getStatusLabel(invoice.status),
+              'حالة الدفع': getPaymentStatusLabel(paymentStatus),
+              'المنتج': '',
+              'الكمية': '',
+              'سعر الوحدة': '',
+            },
+          ];
+        }
+
+        return items.map((item, index) => {
+          const quantity = parseFloat(String(item.quantity || 0));
+          const unitPrice = parseFloat(String(item.unit_price || 0));
+          const productName = item.product_name || item.description || 'منتج غير محدد';
+
+          return {
+            'رقم الفاتورة': index === 0 ? invoice.invoice_number : '',
+            'العميل': index === 0 ? (invoice.customer?.name || 'عميل نقدي') : '',
+            'التاريخ': index === 0 ? invoiceDate : '',
+            'الإجمالي': index === 0 ? total : '',
+            'المدفوع': index === 0 ? paid : '',
+            'المتبقي': index === 0 ? remaining : '',
+            'حالة الفاتورة': index === 0 ? getStatusLabel(invoice.status) : '',
+            'حالة الدفع': index === 0 ? getPaymentStatusLabel(paymentStatus) : '',
+            'المنتج': productName,
+            'الكمية': quantity,
+            'سعر الوحدة': unitPrice,
+          };
+        });
       });
 
       const worksheet = XLSX.utils.json_to_sheet(rows, { header: exportHeaders });
@@ -240,8 +258,8 @@ export default function InvoicesPage() {
         { wch: 12 },
         { wch: 18 },
         { wch: 18 },
-        { wch: 24 },
-        { wch: 12 },
+        { wch: 28 },
+        { wch: 10 },
         { wch: 12 },
       ];
 
