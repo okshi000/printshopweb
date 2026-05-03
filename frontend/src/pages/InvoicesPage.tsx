@@ -92,14 +92,6 @@ export default function InvoicesPage() {
     },
   });
 
-  const { data: statistics, isLoading: statsLoading } = useQuery({
-    queryKey: ['invoices-statistics'],
-    queryFn: async () => {
-      const res = await invoicesApi.statistics({ days: 30 });
-      return res.data;
-    },
-  });
-
   // Client-side filter for payment status only (since backend doesn't support it)
   const filteredInvoices = data?.data?.filter((inv: Invoice) => {
     if (paymentStatusFilter) {
@@ -348,89 +340,6 @@ export default function InvoicesPage() {
             </Button>
           )}
         </div>
-      </div>
-
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="shadow-soft overflow-hidden border-0 bg-gradient-to-br from-blue-50 to-blue-50/50 dark:from-blue-950/20 dark:to-blue-950/40">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-1">فاتورة (آخر 30 يوم)</p>
-                <p className="text-2xl font-bold text-foreground">
-                  {statsLoading ? (
-                    <Skeleton className="h-8 w-12" />
-                  ) : (
-                    statistics?.total_invoices || 0
-                  )}
-                </p>
-              </div>
-              <div className="h-12 w-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                <FileText className="h-6 w-6 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-soft overflow-hidden border-0 bg-gradient-to-br from-green-50 to-green-50/50 dark:from-green-950/20 dark:to-green-950/40">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-1">إجمالي المبيعات</p>
-                <p className="text-2xl font-bold text-foreground">
-                  {statsLoading ? (
-                    <Skeleton className="h-8 w-24" />
-                  ) : (
-                    formatCurrency(statistics?.total_sales || 0)
-                  )}
-                </p>
-              </div>
-              <div className="h-12 w-12 rounded-xl bg-green-500/20 flex items-center justify-center">
-                <Receipt className="h-6 w-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-soft overflow-hidden border-0 bg-gradient-to-br from-purple-50 to-purple-50/50 dark:from-purple-950/20 dark:to-purple-950/40">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-1">إجمالي الأرباح</p>
-                <p className="text-2xl font-bold text-foreground">
-                  {statsLoading ? (
-                    <Skeleton className="h-8 w-24" />
-                  ) : (
-                    formatCurrency(statistics?.total_profits || 0)
-                  )}
-                </p>
-              </div>
-              <div className="h-12 w-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                <Banknote className="h-6 w-6 text-purple-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-soft overflow-hidden border-0 bg-gradient-to-br from-amber-50 to-amber-50/50 dark:from-amber-950/20 dark:to-amber-950/40">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-1">المتوسط لكل فاتورة</p>
-                <p className="text-2xl font-bold text-foreground">
-                  {statsLoading ? (
-                    <Skeleton className="h-8 w-24" />
-                  ) : (
-                    formatCurrency(statistics?.average_invoice || 0)
-                  )}
-                </p>
-              </div>
-              <div className="h-12 w-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
-                <FileText className="h-6 w-6 text-amber-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Filters */}
