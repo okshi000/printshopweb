@@ -51,6 +51,7 @@ interface NavItem {
   to: string;
   color?: string;
   special?: boolean;
+  permission?: string;
 }
 
 interface NavSection {
@@ -62,17 +63,17 @@ const navSections: NavSection[] = [
   {
     title: 'الرئيسية',
     items: [
-      { icon: LayoutDashboard, label: 'لوحة التحكم', to: '/' },
-      { icon: FileText, label: 'الفواتير', to: '/invoices' },
-      { icon: Plus, label: 'فاتورة جديدة', to: '/invoices/create', color: 'success' },
+      { icon: LayoutDashboard, label: 'لوحة التحكم', to: '/', permission: 'dashboard.view' },
+      { icon: FileText, label: 'الفواتير', to: '/invoices', permission: 'invoices.view' },
+      { icon: Plus, label: 'فاتورة جديدة', to: '/invoices/create', color: 'success', permission: 'invoices.create' },
     ],
   },
   {
     title: 'الإدارة',
     items: [
-      { icon: Users, label: 'العملاء', to: '/customers' },
-      { icon: Truck, label: 'الموردين / المطابع', to: '/suppliers' },
-      { icon: Package, label: 'المنتجات', to: '/products' },
+      { icon: Users, label: 'العملاء', to: '/customers', permission: 'customers.view' },
+      { icon: Truck, label: 'الموردين / المطابع', to: '/suppliers', permission: 'suppliers.view' },
+      { icon: Package, label: 'المنتجات', to: '/products', permission: 'products.view' },
     ],
   },
   {
@@ -83,30 +84,31 @@ const navSections: NavSection[] = [
         label: 'المحاسب الآلي', 
         to: '/accountant', 
         color: 'warning',
-        special: true 
+        special: true,
+        permission: 'reports.view'
       },
     ],
   },
   {
     title: 'المالية',
     items: [
-      { icon: Wallet, label: 'الخزنة', to: '/cash' },
-      { icon: Receipt, label: 'المصروفات', to: '/expenses' },
-      { icon: Coins, label: 'الديون، السلف والسحوبات', to: '/debts' },
+      { icon: Wallet, label: 'الخزنة', to: '/cash', permission: 'cash.view' },
+      { icon: Receipt, label: 'المصروفات', to: '/expenses', permission: 'expenses.view' },
+      { icon: Coins, label: 'الديون، السلف والسحوبات', to: '/debts', permission: 'debts.view' },
     ],
   },
   {
     title: 'أخرى',
     items: [
-      { icon: Warehouse, label: 'المخزون', to: '/inventory' },
-      { icon: BarChart3, label: 'التقارير', to: '/reports' },
+      { icon: Warehouse, label: 'المخزون', to: '/inventory', permission: 'inventory.view' },
+      { icon: BarChart3, label: 'التقارير', to: '/reports', permission: 'reports.view' },
     ],
   },
   {
     title: 'الإعدادات',
     items: [
-      { icon: UserCog, label: 'المستخدمين والصلاحيات', to: '/users' },
-      { icon: History, label: 'سجل النشاط', to: '/activity' },
+      { icon: UserCog, label: 'المستخدمين والصلاحيات', to: '/users', permission: 'users.view' },
+      { icon: History, label: 'سجل النشاط', to: '/activity', permission: 'activity.view' },
     ],
   },
 ];
@@ -176,7 +178,7 @@ function SidebarItem({ item, isActive, collapsed }: { item: NavItem; isActive: b
 export default function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermission } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -215,42 +217,52 @@ export default function MainLayout() {
       {/* Navigation */}
       <ScrollArea className="flex-1 px-3 py-4">
         <TooltipProvider>
-          {navSections.map((section, sectionIndex) => (
-            <div key={section.title} className="mb-6">
-              <AnimatePresence>
-                {sidebarOpen && (
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider"
-                  >
-                    {section.title}
-                  </motion.p>
+          {navSections.map((section, sectionIndex) => {
+            // Filter items based on user permissions
+            const visibleItems = section.items.filter(
+              (item) => !item.permission || hasPermission(item.permission)
+            );
+            
+            // Don't render the section if no items are visible
+            if (visibleItems.length === 0) return null;
+            
+            return (
+              <div key={section.title} className="mb-6">
+                <AnimatePresence>
+                  {sidebarOpen && (
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+                    >
+                      {section.title}
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+                
+                <div className="space-y-1">
+                  {visibleItems.map((item) => {
+                    const isActive = location.pathname === item.to || 
+                      (item.to !== '/' && location.pathname.startsWith(item.to));
+                    
+                    return (
+                      <SidebarItem
+                        key={item.to}
+                        item={item}
+                        isActive={isActive}
+                        collapsed={!sidebarOpen}
+                      />
+                    );
+                  })}
+                </div>
+                
+                {sectionIndex < navSections.length - 1 && sidebarOpen && (
+                  <Separator className="mt-4 opacity-50" />
                 )}
-              </AnimatePresence>
-              
-              <div className="space-y-1">
-                {section.items.map((item) => {
-                  const isActive = location.pathname === item.to || 
-                    (item.to !== '/' && location.pathname.startsWith(item.to));
-                  
-                  return (
-                    <SidebarItem
-                      key={item.to}
-                      item={item}
-                      isActive={isActive}
-                      collapsed={!sidebarOpen}
-                    />
-                  );
-                })}
               </div>
-              
-              {sectionIndex < navSections.length - 1 && sidebarOpen && (
-                <Separator className="mt-4 opacity-50" />
-              )}
-            </div>
-          ))}
+            );
+          })}
         </TooltipProvider>
       </ScrollArea>
 
@@ -323,6 +335,9 @@ export default function MainLayout() {
               className="fixed right-0 top-0 z-50 h-full w-72 border-l border-border bg-card shadow-xl lg:hidden"
             >
               <button
+                type="button"
+                aria-label="Close sidebar"
+                title="Close sidebar"
                 onClick={() => setMobileOpen(false)}
                 className="absolute left-4 top-4 p-2 rounded-lg hover:bg-accent"
               >
