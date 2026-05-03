@@ -22,6 +22,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { cn, formatCurrency, fadeInUp, staggerContainer } from '@/lib/utils'
 import { invoicesApi, customersApi, productsApi, suppliersApi } from '../api'
+import { useAuth } from '../contexts/AuthContext'
 import type { Customer, Product } from '../types'
 import { QuickAddCustomerDialog } from '@/components/quick-add/QuickAddCustomerDialog'
 import { QuickAddProductDialog } from '@/components/quick-add/QuickAddProductDialog'
@@ -57,8 +58,8 @@ interface InvoiceItem {
   costs: ItemCost[]
 }
 
-export default function CreateInvoicePage() {
   const navigate = useNavigate()
+  const { user, hasPermission } = useAuth()
   const { id } = useParams<{ id: string }>()
   const [searchParams] = useSearchParams()
   const isEditMode = !!id
@@ -400,40 +401,42 @@ export default function CreateInvoicePage() {
                       </div>
 
                       {/* Costs */}
-                      <div className="border-t pt-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <Label className="flex items-center gap-1"><Coins className="h-4 w-4" /> التكاليف</Label>
-                          <Button variant="outline" size="sm" onClick={() => addCost(item.id)}>
-                            <Plus className="h-3 w-3" /> تكلفة
-                          </Button>
-                        </div>
-                        {item.costs.map((cost) => (
-                          <div key={cost.id} className="flex items-end gap-2 mb-2">
-                            <div className="flex-1 space-y-1">
-                              <Label className="text-xs">المورد</Label>
-                              <SearchableSelect
-                                value={cost.supplier_id || ''}
-                                onValueChange={(v) => updateCost(item.id, cost.id, 'supplier_id', v)}
-                                options={supplierOptions}
-                                placeholder="اختر"
-                                searchPlaceholder="ابحث عن مورد..."
-                                triggerClassName="h-9"
-                              />
-                            </div>
-                            <div className="flex-1 space-y-1">
-                              <Label className="text-xs">النوع</Label>
-                              <Input className="h-9" value={cost.cost_type} onChange={(e) => updateCost(item.id, cost.id, 'cost_type', e.target.value)} placeholder="طباعة خارجية" />
-                            </div>
-                            <div className="w-28 space-y-1">
-                              <Label className="text-xs">المبلغ</Label>
-                              <Input className="h-9" type="number" min={0} value={cost.amount} onChange={(e) => updateCost(item.id, cost.id, 'amount', parseFloat(e.target.value) || 0)} />
-                            </div>
-                            <Button variant="ghost" size="icon" className="h-9 text-red-600" onClick={() => removeCost(item.id, cost.id)}>
-                              <Trash2 className="h-4 w-4" />
+                      {hasPermission('invoices.manage_costs') && (
+                        <div className="border-t pt-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <Label className="flex items-center gap-1"><Coins className="h-4 w-4" /> التكاليف</Label>
+                            <Button variant="outline" size="sm" onClick={() => addCost(item.id)}>
+                              <Plus className="h-3 w-3" /> تكلفة
                             </Button>
                           </div>
-                        ))}
-                      </div>
+                          {item.costs.map((cost) => (
+                            <div key={cost.id} className="flex items-end gap-2 mb-2">
+                              <div className="flex-1 space-y-1">
+                                <Label className="text-xs">المورد</Label>
+                                <SearchableSelect
+                                  value={cost.supplier_id || ''}
+                                  onValueChange={(v) => updateCost(item.id, cost.id, 'supplier_id', v)}
+                                  options={supplierOptions}
+                                  placeholder="اختر"
+                                  searchPlaceholder="ابحث عن مورد..."
+                                  triggerClassName="h-9"
+                                />
+                              </div>
+                              <div className="flex-1 space-y-1">
+                                <Label className="text-xs">النوع</Label>
+                                <Input className="h-9" value={cost.cost_type} onChange={(e) => updateCost(item.id, cost.id, 'cost_type', e.target.value)} placeholder="طباعة خارجية" />
+                              </div>
+                              <div className="w-28 space-y-1">
+                                <Label className="text-xs">المبلغ</Label>
+                                <Input className="h-9" type="number" min={0} value={cost.amount} onChange={(e) => updateCost(item.id, cost.id, 'amount', parseFloat(e.target.value) || 0)} />
+                              </div>
+                              <Button variant="ghost" size="icon" className="h-9 text-red-600" onClick={() => removeCost(item.id, cost.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
 
                       <div className="text-left text-sm font-medium">
                         إجمالي البند: <span className="text-primary">{formatCurrency(item.quantity * item.price)}</span>
@@ -459,21 +462,37 @@ export default function CreateInvoicePage() {
                   <span className="font-medium">{formatCurrency(subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">إجمالي التكاليف:</span>
-                  <span className="font-medium text-orange-600">{formatCurrency(totalCosts)}</span>
+                  <span className="text-muted-foreground">المجموع الفرعي:</span>
+                  <span className="font-medium">{formatCurrency(subtotal)}</span>
                 </div>
-                <div className="border-t pt-2">
-                  <div className="flex justify-between">
-                    <span className="font-semibold">الإجمالي:</span>
-                    <span className="text-xl font-bold text-primary">{formatCurrency(subtotal)}</span>
+                {hasPermission('invoices.view_costs') && (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">إجمالي التكاليف:</span>
+                      <span className="font-medium text-orange-600">{formatCurrency(totalCosts)}</span>
+                    </div>
+                    <div className="border-t pt-2">
+                      <div className="flex justify-between">
+                        <span className="font-semibold">الإجمالي:</span>
+                        <span className="text-xl font-bold text-primary">{formatCurrency(subtotal)}</span>
+                      </div>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">صافي الربح:</span>
+                      <span className={cn('font-semibold', subtotal - totalCosts >= 0 ? 'text-emerald-600' : 'text-red-600')}>
+                        {formatCurrency(subtotal - totalCosts)}
+                      </span>
+                    </div>
+                  </>
+                )}
+                {!hasPermission('invoices.view_costs') && (
+                  <div className="border-t pt-2">
+                    <div className="flex justify-between">
+                      <span className="font-semibold">الإجمالي:</span>
+                      <span className="text-xl font-bold text-primary">{formatCurrency(subtotal)}</span>
+                    </div>
                   </div>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">صافي الربح:</span>
-                  <span className={cn('font-semibold', subtotal - totalCosts >= 0 ? 'text-emerald-600' : 'text-red-600')}>
-                    {formatCurrency(subtotal - totalCosts)}
-                  </span>
-                </div>
+                )}
               </div>
 
               <Button className="w-full gap-2" size="lg" onClick={handleSubmit} disabled={createMutation.isPending}>

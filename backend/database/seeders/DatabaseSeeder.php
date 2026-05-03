@@ -50,6 +50,8 @@ class DatabaseSeeder extends Seeder
             'users.view' => 'عرض المستخدمين',
             'users.manage' => 'إدارة المستخدمين',
             'activity.view' => 'عرض سجل النشاط',
+            'invoices.view_costs' => 'عرض التكاليف والأرباح',
+            'invoices.manage_costs' => 'إضافة وتعديل التكاليف',
         ];
 
         foreach ($permissions as $name => $description) {

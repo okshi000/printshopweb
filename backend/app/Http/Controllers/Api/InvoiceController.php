@@ -50,6 +50,14 @@ class InvoiceController extends Controller
         $invoices = $query->orderBy('created_at', 'desc')
             ->paginate($request->per_page ?? 10);
 
+        // Hide costs if user doesn't have permission
+        if (!$request->user()->hasPermissionTo('invoices.view_costs')) {
+            $invoices->getCollection()->transform(function ($invoice) {
+                $invoice->makeHidden(['total_cost', 'profit']);
+                return $invoice;
+            });
+        }
+
         return response()->json($invoices);
     }
 
@@ -75,7 +83,7 @@ class InvoiceController extends Controller
             'items.*.costs.*.notes' => 'nullable|string',
         ]);
 
-        $invoice = DB::transaction(function () use ($validated) {
+        $invoice = DB::transaction(function () use ($validated, $request) {
             $invoice = Invoice::create([
                 'invoice_number' => Invoice::generateInvoiceNumber(),
                 'customer_id' => $validated['customer_id'] ?? null,
@@ -84,6 +92,8 @@ class InvoiceController extends Controller
                 'discount' => $validated['discount'] ?? 0,
                 'notes' => $validated['notes'] ?? null,
             ]);
+
+            $canManageCosts = $request->user()->hasPermissionTo('invoices.manage_costs');
 
             foreach ($validated['items'] as $itemData) {
                 $totalPrice = $itemData['quantity'] * $itemData['unit_price'];
@@ -105,7 +115,7 @@ class InvoiceController extends Controller
                 ]);
 
                 $totalCost = 0;
-                if (!empty($itemData['costs'])) {
+                if ($canManageCosts && !empty($itemData['costs'])) {
                     foreach ($itemData['costs'] as $costData) {
                         $item->costs()->create([
                             'supplier_id' => $costData['supplier_id'] ?? null,
@@ -113,9 +123,9 @@ class InvoiceController extends Controller
                             'amount' => $costData['amount'],
                             'is_internal' => $costData['is_internal'] ?? false,
                             'notes' => $costData['notes'] ?? null,
-                            'is_paid' => false, // تأكد من تعيين is_paid كـ false افتراضياً
+                            'is_paid' => false,
                         ]);
-                        $totalCost += $costData['amount']; // التكلفة الإجمالية مباشرة بدون ضرب في الكمية
+                        $totalCost += $costData['amount'];
                     }
                 }
 
@@ -135,7 +145,7 @@ class InvoiceController extends Controller
         return response()->json($invoice->load(['customer', 'items.costs', 'payments']), 201);
     }
 
-    public function show(Invoice $invoice): JsonResponse
+    public function show(Request $request, Invoice $invoice): JsonResponse
     {
         $invoice->load([
             'customer',
@@ -143,6 +153,14 @@ class InvoiceController extends Controller
             'items.costs.supplier',
             'payments',
         ]);
+
+        // Hide costs if user doesn't have permission
+        if (!$request->user()->hasPermissionTo('invoices.view_costs')) {
+            $invoice->makeHidden(['total_cost', 'profit']);
+            $invoice->items->each(function ($item) {
+                $item->makeHidden(['total_cost', 'profit', 'costs']);
+            });
+        }
 
         return response()->json($invoice);
     }
@@ -170,7 +188,7 @@ class InvoiceController extends Controller
             'items.*.costs.*.notes' => 'nullable|string',
         ]);
 
-        return DB::transaction(function () use ($validated, $invoice) {
+        return DB::transaction(function () use ($validated, $invoice, $request) {
             $oldValues = $invoice->toArray();
             
             // Update basic invoice data
@@ -182,6 +200,8 @@ class InvoiceController extends Controller
                 'notes' => $validated['notes'] ?? $invoice->notes,
                 'status' => $validated['status'] ?? $invoice->status,
             ]);
+
+            $canManageCosts = $request->user()->hasPermissionTo('invoices.manage_costs');
 
             // If items are provided, update them
             if (isset($validated['items'])) {
@@ -214,7 +234,7 @@ class InvoiceController extends Controller
                     ]);
 
                     $totalCost = 0;
-                    if (!empty($itemData['costs'])) {
+                    if ($canManageCosts && !empty($itemData['costs'])) {
                         foreach ($itemData['costs'] as $costData) {
                             $item->costs()->create([
                                 'supplier_id' => $costData['supplier_id'] ?? null,
@@ -321,17 +341,23 @@ class InvoiceController extends Controller
             $q->where('invoice_date', '>=', $fromDate);
         })->sum('amount');
 
-        return response()->json([
+        $responseData = [
             'period_days' => $days,
             'from_date' => $fromDate,
             'to_date' => now()->toDateString(),
             'total_invoices' => $totalInvoices,
             'total_sales' => round($totalSales, 2),
-            'total_costs' => round($totalCosts, 2),
-            'total_profits' => round($totalProfits, 2),
             'total_paid' => round($totalPaid, 2),
             'average_invoice' => $totalInvoices > 0 ? round($totalSales / $totalInvoices, 2) : 0,
-        ]);
+        ];
+
+        // Only include costs and profits if the user has permission
+        if ($request->user()->hasPermissionTo('invoices.view_costs')) {
+            $responseData['total_costs'] = round($totalCosts, 2);
+            $responseData['total_profits'] = round($totalProfits, 2);
+        }
+
+        return response()->json($responseData);
     }
 
     public function destroy(Invoice $invoice): JsonResponse

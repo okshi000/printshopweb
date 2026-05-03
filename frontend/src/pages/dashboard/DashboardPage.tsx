@@ -15,6 +15,7 @@ import {
   Package,
   Users,
 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency, staggerContainer, staggerItem } from '@/lib/utils';
 import { StatsCard, CardContent, CardHeader, CardTitle, AnimatedCard } from '@/components/ui/card';
 import { Badge, StatusBadge } from '@/components/ui/badge';
@@ -82,6 +83,7 @@ function formatNumber(value: number): string {
 }
 
 export default function DashboardPage() {
+  const { hasPermission } = useAuth();
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ['dashboard'],
     queryFn: async () => {
@@ -154,13 +156,15 @@ export default function DashboardPage() {
             gradient="primary"
             trend={{ value: 12, isPositive: true }}
           />
-          <StatsCard
-            title="ربح اليوم"
-            value={formatCurrency(data.today.profit)}
-            icon={<TrendingUp className="h-5 w-5" />}
-            gradient="success"
-            trend={{ value: 8, isPositive: data.today.profit >= 0 }}
-          />
+          {hasPermission('invoices.view_costs') && (
+            <StatsCard
+              title="ربح اليوم"
+              value={formatCurrency(data.today.profit)}
+              icon={<TrendingUp className="h-5 w-5" />}
+              gradient="success"
+              trend={{ value: 8, isPositive: data.today.profit >= 0 }}
+            />
+          )}
         </div>
       </motion.div>
 
@@ -173,12 +177,14 @@ export default function DashboardPage() {
             icon={<TrendingUp className="h-5 w-5" />}
             gradient="primary"
           />
-          <StatsCard
-            title="أرباح الشهر"
-            value={formatCurrency(data.month.profit)}
-            icon={<TrendingUp className="h-5 w-5" />}
-            gradient="success"
-          />
+          {hasPermission('invoices.view_costs') && (
+            <StatsCard
+              title="أرباح الشهر"
+              value={formatCurrency(data.month.profit)}
+              icon={<TrendingUp className="h-5 w-5" />}
+              gradient="success"
+            />
+          )}
           <StatsCard
             title="ديون العملاء"
             value={formatCurrency(data.debts.customers_debt)}

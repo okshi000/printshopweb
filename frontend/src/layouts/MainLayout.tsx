@@ -85,7 +85,7 @@ const navSections: NavSection[] = [
         to: '/accountant', 
         color: 'warning',
         special: true,
-        permission: 'reports.view'
+        permission: 'invoices.view_costs'
       },
     ],
   },

@@ -137,15 +137,13 @@ class AccountantController extends Controller
             ->distinct('customer_id')
             ->count();
 
-        return response()->json([
+        $canViewCosts = $request->user()->hasPermissionTo('invoices.view_costs');
+
+        $responseData = [
             // البيانات الأساسية للـ Frontend
             'total_revenue' => $total_revenue,
-            'total_expenses' => $total_expenses,
-            'net_profit' => $net_profit,
             'available_cash' => $total_cash,
             'revenue_change' => $revenue_change,
-            'expenses_change' => $expenses_change,
-            'profit_change' => $profit_change,
 
             // بيانات المستحقات
             'customer_receivables' => $customer_debts,
@@ -167,14 +165,10 @@ class AccountantController extends Controller
 
             // مؤشرات الأداء الرئيسية (KPIs)
             'kpis' => [
-                'gross_profit_margin' => $gross_profit_margin,
-                'net_profit_margin' => $net_profit_margin,
-                'operating_expense_ratio' => $operating_expense_ratio,
                 'current_ratio' => $current_ratio,
                 'quick_ratio' => $quick_ratio,
                 'days_payable_outstanding' => $dpo,
                 'avg_invoice_value' => $avg_invoice_value,
-                'cogs_percentage' => $total_revenue > 0 ? round(($total_cogs / $total_revenue) * 100, 2) : 0,
             ],
 
             // بيانات تفصيلية
@@ -182,22 +176,36 @@ class AccountantController extends Controller
                 'cash_balance' => $cashBalance->cash_balance ?? 0,
                 'bank_balance' => $cashBalance->bank_balance ?? 0,
                 'total_cash' => $total_cash,
-                'inventory_value' => $inventory_value,
                 'customer_debts' => $customer_debts,
                 'other_debts' => $other_debts,
-                'total' => $total_assets,
+                'total' => $total_assets - $inventory_value, // إخفاء قيمة المخزون لأنها تعتمد على التكلفة
             ],
             'liabilities' => [
                 'supplier_debts' => $supplier_debts,
                 'total' => $total_liabilities,
             ],
-            'equity' => $equity,
             'period' => [
                 'start_date' => $startDate,
                 'end_date' => $endDate,
                 'days' => $daysDiff,
             ],
-        ]);
+        ];
+
+        if ($canViewCosts) {
+            $responseData['total_expenses'] = $total_expenses;
+            $responseData['net_profit'] = $net_profit;
+            $responseData['expenses_change'] = $expenses_change;
+            $responseData['profit_change'] = $profit_change;
+            $responseData['kpis']['gross_profit_margin'] = $gross_profit_margin;
+            $responseData['kpis']['net_profit_margin'] = $net_profit_margin;
+            $responseData['kpis']['operating_expense_ratio'] = $operating_expense_ratio;
+            $responseData['kpis']['cogs_percentage'] = $total_revenue > 0 ? round(($total_cogs / $total_revenue) * 100, 2) : 0;
+            $responseData['assets']['inventory_value'] = $inventory_value;
+            $responseData['assets']['total'] = $total_assets;
+            $responseData['equity'] = $equity;
+        }
+
+        return response()->json($responseData);
     }
 
     /**
@@ -243,7 +251,7 @@ class AccountantController extends Controller
         $total_expenses = $expensesDetails->sum('amount');
         $net_profit = $gross_profit - $total_expenses;
 
-        return response()->json([
+        $responseData = [
             'period' => [
                 'start_date' => $startDate,
                 'end_date' => $endDate,
@@ -254,17 +262,22 @@ class AccountantController extends Controller
                 'discount' => $salesData->discount ?? 0,
                 'total' => $total_revenue,
             ],
-            'cogs' => [
+        ];
+
+        if ($request->user()->hasPermissionTo('invoices.view_costs')) {
+            $responseData['cogs'] = [
                 'details' => $cogsDetails,
                 'total' => $total_cogs,
-            ],
-            'gross_profit' => $gross_profit,
-            'expenses' => [
+            ];
+            $responseData['gross_profit'] = $gross_profit;
+            $responseData['expenses'] = [
                 'details' => $expensesDetails,
                 'total' => $total_expenses,
-            ],
-            'net_profit' => $net_profit,
-        ]);
+            ];
+            $responseData['net_profit'] = $net_profit;
+        }
+
+        return response()->json($responseData);
     }
 
     /**

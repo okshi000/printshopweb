@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/table'
 import { cn, formatCurrency, fadeInUp, staggerContainer, getPaymentStatus, getPaymentStatusColor, getPaymentStatusLabel } from '@/lib/utils'
 import { invoicesApi } from '../api'
+import { useAuth } from '../contexts/AuthContext'
 
 // Helper function to safely format dates
 const formatDate = (date: string | null | undefined, formatStr: string, options?: any) => {
@@ -94,6 +95,7 @@ const statusMap: Record<string, { label: string; color: string; icon: React.Reac
 export default function ViewInvoicePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { hasPermission } = useAuth()
   const queryClient = useQueryClient()
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState('')
@@ -292,7 +294,7 @@ export default function ViewInvoicePage() {
                           <div>
                             <p className="font-medium">{item.product_name}</p>
                             {item.notes && <p className="text-xs text-muted-foreground">{item.notes}</p>}
-                            {item.costs && item.costs.length > 0 && (
+                            {hasPermission('invoices.view_costs') && item.costs && item.costs.length > 0 && (
                               <div className="mt-1 flex flex-wrap gap-1">
                                 {item.costs.map((cost) => (
                                   <Badge key={cost.id} variant="outline" className="text-xs">
@@ -379,10 +381,12 @@ export default function ViewInvoicePage() {
                   {getPaymentStatusLabel(getPaymentStatus(invoice.total_amount, invoice.paid_amount))}
                 </Badge>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">التكاليف:</span>
-                <span className="font-medium text-orange-600">{formatCurrency(totalCosts)}</span>
-              </div>
+              {hasPermission('invoices.view_costs') && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">التكاليف:</span>
+                  <span className="font-medium text-orange-600">{formatCurrency(totalCosts)}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">المدفوع:</span>
                 <span className="font-medium text-emerald-600">{formatCurrency(invoice.paid_amount)}</span>
@@ -393,12 +397,14 @@ export default function ViewInvoicePage() {
                   {formatCurrency(invoice.remaining_amount)}
                 </span>
               </div>
-              <div className="border-t pt-3 flex justify-between">
-                <span className="text-muted-foreground">صافي الربح:</span>
-                <span className={cn('font-semibold', invoice.total_amount - totalCosts >= 0 ? 'text-emerald-600' : 'text-red-600')}>
-                  {formatCurrency(invoice.total_amount - totalCosts)}
-                </span>
-              </div>
+              {hasPermission('invoices.view_costs') && (
+                <div className="border-t pt-3 flex justify-between">
+                  <span className="text-muted-foreground">صافي الربح:</span>
+                  <span className={cn('font-semibold', invoice.total_amount - totalCosts >= 0 ? 'text-emerald-600' : 'text-red-600')}>
+                    {formatCurrency(invoice.total_amount - totalCosts)}
+                  </span>
+                </div>
+              )}
             </CardContent>
           </Card>
 

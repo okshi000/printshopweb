@@ -27,15 +27,20 @@ class DashboardController extends Controller
             'payments_received' => Invoice::whereDate('invoice_date', $today)->sum('paid_amount'),
             'expenses' => Expense::whereDate('expense_date', $today)->sum('amount'),
         ];
-        $todayStats['profit'] = $todayStats['sales'] - $todayStats['expenses'];
+        $todayStats['profit'] = ($request->user()->hasPermissionTo('invoices.view_costs')) 
+            ? $todayStats['sales'] - $todayStats['expenses'] 
+            : 0;
 
         // This month's stats
         $monthStats = [
             'sales' => Invoice::where('invoice_date', '>=', $thisMonth)->sum('total'),
-            'profit' => Invoice::where('invoice_date', '>=', $thisMonth)->sum('profit'),
-            'expenses' => Expense::where('expense_date', '>=', $thisMonth)->sum('amount'),
             'invoices_count' => Invoice::where('invoice_date', '>=', $thisMonth)->count(),
         ];
+
+        if ($request->user()->hasPermissionTo('invoices.view_costs')) {
+            $monthStats['profit'] = Invoice::where('invoice_date', '>=', $thisMonth)->sum('profit');
+            $monthStats['expenses'] = Expense::where('expense_date', '>=', $thisMonth)->sum('amount');
+        }
 
         // Cash balance
         $balance = CashBalance::getBalance();
@@ -70,7 +75,7 @@ class DashboardController extends Controller
             ->limit(5)
             ->get(['id', 'invoice_number', 'customer_id', 'total', 'status', 'created_at']);
 
-        return response()->json([
+        $response = [
             'today' => $todayStats,
             'month' => $monthStats,
             'cash_balance' => $cashBalance,
@@ -78,7 +83,16 @@ class DashboardController extends Controller
             'invoice_status' => $invoiceStatus,
             'low_stock_items' => $lowStockItems,
             'recent_invoices' => $recentInvoices,
-        ]);
+        ];
+
+        // Clean up sensitive data if no permission
+        if (!$request->user()->hasPermissionTo('invoices.view_costs')) {
+            unset($response['today']['expenses']);
+            unset($response['today']['profit']);
+            // profit and expenses already handled in $monthStats
+        }
+
+        return response()->json($response);
     }
 
     public function charts(Request $request): JsonResponse
@@ -86,12 +100,16 @@ class DashboardController extends Controller
         $days = $request->days ?? 30;
         $startDate = Carbon::now()->subDays($days);
 
-        // Daily sales for chart
-        $dailySales = Invoice::selectRaw('DATE(invoice_date) as date, SUM(total) as total, SUM(profit) as profit')
+        $dailySalesQuery = Invoice::selectRaw('DATE(invoice_date) as date, SUM(total) as total')
             ->where('invoice_date', '>=', $startDate)
             ->groupBy('date')
-            ->orderBy('date')
-            ->get();
+            ->orderBy('date');
+
+        if ($request->user()->hasPermissionTo('invoices.view_costs')) {
+            $dailySalesQuery->selectRaw('SUM(profit) as profit');
+        }
+
+        $dailySales = $dailySalesQuery->get();
 
         // Monthly comparison
         $thisMonth = Carbon::now()->startOfMonth();
@@ -100,13 +118,16 @@ class DashboardController extends Controller
         $comparison = [
             'this_month' => [
                 'sales' => Invoice::where('invoice_date', '>=', $thisMonth)->sum('total'),
-                'expenses' => Expense::where('expense_date', '>=', $thisMonth)->sum('amount'),
             ],
             'last_month' => [
                 'sales' => Invoice::whereBetween('invoice_date', [$lastMonth, $thisMonth])->sum('total'),
-                'expenses' => Expense::whereBetween('expense_date', [$lastMonth, $thisMonth])->sum('amount'),
             ],
         ];
+
+        if ($request->user()->hasPermissionTo('invoices.view_costs')) {
+            $comparison['this_month']['expenses'] = Expense::where('expense_date', '>=', $thisMonth)->sum('amount');
+            $comparison['last_month']['expenses'] = Expense::whereBetween('expense_date', [$lastMonth, $thisMonth])->sum('amount');
+        }
 
         return response()->json([
             'daily_sales' => $dailySales,

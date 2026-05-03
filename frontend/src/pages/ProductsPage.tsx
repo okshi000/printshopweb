@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -308,7 +308,7 @@ export default function ProductsPage() {
                     <TableHead className="font-semibold">الفئة</TableHead>
                     <TableHead className="font-semibold">الوحدة</TableHead>
                     <TableHead className="font-semibold">سعر البيع</TableHead>
-                    <TableHead className="font-semibold">التكلفة</TableHead>
+                    {hasPermission('invoices.view_costs') && <TableHead className="font-semibold">التكلفة</TableHead>}
                     <TableHead className="font-semibold">المخزون</TableHead>
                     <TableHead className="font-semibold text-center">الإجراءات</TableHead>
                   </TableRow>
@@ -365,11 +365,13 @@ export default function ProductsPage() {
                               {formatCurrency(unitPrice)}
                             </span>
                           </TableCell>
-                          <TableCell>
-                            <span className="text-sm text-muted-foreground">
-                              {formatCurrency(costPrice)}
-                            </span>
-                          </TableCell>
+                          {hasPermission('invoices.view_costs') && (
+                            <TableCell>
+                              <span className="text-sm text-muted-foreground">
+                                {formatCurrency(costPrice)}
+                              </span>
+                            </TableCell>
+                          )}
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <Badge 
@@ -542,17 +544,19 @@ export default function ProductsPage() {
                   {...form.register('unit_price', { valueAsNumber: true })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="cost_price">سعر التكلفة</Label>
-                <Input
-                  id="cost_price"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0"
-                  {...form.register('cost_price', { valueAsNumber: true })}
-                />
-              </div>
+              {hasPermission('invoices.manage_costs') && (
+                <div className="space-y-2">
+                  <Label htmlFor="cost_price">سعر التكلفة</Label>
+                  <Input
+                    id="cost_price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0"
+                    {...form.register('cost_price', { valueAsNumber: true })}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -643,20 +647,24 @@ export default function ProductsPage() {
                       {formatCurrency(unitPrice)}
                     </p>
                   </div>
-                  <div className="p-3 rounded-lg bg-muted/50 text-center">
-                    <DollarSign className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-                    <div className="text-sm text-muted-foreground">التكلفة</div>
-                    <p className="text-lg font-bold">
-                      {formatCurrency(costPrice)}
-                    </p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-green-500/10 text-center">
-                    <BarChart3 className="h-5 w-5 mx-auto mb-1 text-green-600" />
-                    <div className="text-sm text-muted-foreground">الهامش</div>
-                    <p className="text-lg font-bold text-green-600">
-                      {profitMargin}%
-                    </p>
-                  </div>
+                  {hasPermission('invoices.view_costs') && (
+                    <>
+                      <div className="p-3 rounded-lg bg-muted/50 text-center">
+                        <DollarSign className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                        <div className="text-sm text-muted-foreground">التكلفة</div>
+                        <p className="text-lg font-bold">
+                          {formatCurrency(costPrice)}
+                        </p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-green-500/10 text-center">
+                        <BarChart3 className="h-5 w-5 mx-auto mb-1 text-green-600" />
+                        <div className="text-sm text-muted-foreground">الهامش</div>
+                        <p className="text-lg font-bold text-green-600">
+                          {profitMargin}%
+                        </p>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

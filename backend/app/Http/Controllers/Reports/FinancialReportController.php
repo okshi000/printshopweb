@@ -64,11 +64,10 @@ class FinancialReportController extends Controller
             ? round((($totalRevenue - $prevRevenue) / $prevRevenue) * 100, 2) 
             : 0;
 
-        return response()->json([
+        $canViewCosts = $request->user()->hasPermissionTo('invoices.view_costs');
+
+        $response = [
             'total_revenue' => (float) $totalRevenue,
-            'total_expenses' => (float) $totalExpenses,
-            'net_profit' => (float) $netProfit,
-            'profit_margin' => $profitMargin,
             'total_debts' => (float) $totalDebts,
             'total_cash' => (float) $totalCash,
             'revenue_growth' => $revenueGrowth,
@@ -76,7 +75,15 @@ class FinancialReportController extends Controller
                 'start' => $startDate,
                 'end' => $endDate
             ]
-        ]);
+        ];
+
+        if ($canViewCosts) {
+            $response['total_expenses'] = (float) $totalExpenses;
+            $response['net_profit'] = (float) $netProfit;
+            $response['profit_margin'] = $profitMargin;
+        }
+
+        return response()->json($response);
     }
 
     /**
@@ -107,24 +114,28 @@ class FinancialReportController extends Controller
             ->get()
             ->keyBy('period');
 
-        // دمج البيانات
-        $allPeriods = $revenues->keys()->merge($expenses->keys())->unique()->sort();
+        $canViewCosts = $request->user()->hasPermissionTo('invoices.view_costs');
         
-        $result = $allPeriods->map(function ($periodKey) use ($revenues, $expenses) {
+        $result = $allPeriods->map(function ($periodKey) use ($revenues, $expenses, $canViewCosts) {
             $revenue = $revenues->get($periodKey);
             $expense = $expenses->get($periodKey);
             
             $revenueAmount = $revenue ? (float) $revenue->revenue : 0;
             $expenseAmount = $expense ? (float) $expense->expenses : 0;
             
-            return [
+            $item = [
                 'period' => $periodKey,
                 'date' => $periodKey,
                 'revenue' => $revenueAmount,
-                'expenses' => $expenseAmount,
-                'profit' => $revenueAmount - $expenseAmount,
                 'invoice_count' => $revenue ? $revenue->invoice_count : 0
             ];
+
+            if ($canViewCosts) {
+                $item['expenses'] = $expenseAmount;
+                $item['profit'] = $revenueAmount - $expenseAmount;
+            }
+
+            return $item;
         })->values();
 
         return response()->json($result);
@@ -137,6 +148,10 @@ class FinancialReportController extends Controller
     {
         $startDate = $request->input('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
         $endDate = $request->input('end_date', Carbon::now()->format('Y-m-d'));
+
+        if (!$request->user()->hasPermissionTo('invoices.view_costs')) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
 
         $data = Expense::select(
                 'expense_types.name as category',
@@ -208,6 +223,14 @@ class FinancialReportController extends Controller
             ? round((($netProfit - $prevNetProfit) / abs($prevNetProfit)) * 100, 2) 
             : 0;
 
+        if (!$request->user()->hasPermissionTo('invoices.view_costs')) {
+            return response()->json([
+                'period' => ['start' => $startDate, 'end' => $endDate],
+                'total_revenue' => (float) $totalRevenue,
+                'message' => 'تفاصيل الأرباح والتكاليف محجوبة'
+            ]);
+        }
+
         return response()->json([
             'period' => [
                 'start' => $startDate,
@@ -252,6 +275,14 @@ class FinancialReportController extends Controller
         // صافي الدخل (نفس الدخل التشغيلي في هذه الحالة البسيطة)
         $netIncome = $operatingIncome;
 
+        if (!$request->user()->hasPermissionTo('invoices.view_costs')) {
+            return response()->json([
+                'period' => "{$startDate} - {$endDate}",
+                'revenue' => (float) $revenue,
+                'message' => 'تفاصيل قائمة الدخل محجوبة'
+            ]);
+        }
+
         return response()->json([
             'period' => "{$startDate} - {$endDate}",
             'revenue' => (float) $revenue,
@@ -292,36 +323,46 @@ class FinancialReportController extends Controller
         // حقوق الملكية
         $equity = $totalAssets - $totalLiabilities;
 
-        return response()->json([
+        $canViewCosts = $request->user()->hasPermissionTo('invoices.view_costs');
+
+        $response = [
             'date' => $date,
             'assets' => [
                 'current' => [
                     'cash' => (float) $cash,
                     'receivables' => (float) $receivables,
-                    'inventory' => (float) $inventoryValue,
-                    'total' => (float) $currentAssets
                 ],
                 'fixed' => [
                     'equipment' => 0.0,
                     'other' => 0.0,
                     'total' => (float) $fixedAssets
                 ],
-                'total' => (float) $totalAssets
             ],
             'liabilities' => [
                 'current' => [
-                    'payables' => (float) $payables,
                     'debts' => 0.0,
-                    'total' => (float) $totalLiabilities
                 ],
-                'total' => (float) $totalLiabilities
             ],
-            'equity' => [
+        ];
+
+        if ($canViewCosts) {
+            $response['assets']['current']['inventory'] = (float) $inventoryValue;
+            $response['assets']['current']['total'] = (float) $currentAssets;
+            $response['assets']['total'] = (float) $totalAssets;
+            $response['liabilities']['current']['payables'] = (float) $payables;
+            $response['liabilities']['current']['total'] = (float) $totalLiabilities;
+            $response['liabilities']['total'] = (float) $totalLiabilities;
+            $response['equity'] = [
                 'capital' => 0.0,
                 'retained_earnings' => (float) $equity,
                 'total' => (float) $equity
-            ]
-        ]);
+            ];
+        } else {
+            $response['assets']['current']['total'] = (float) ($cash + $receivables);
+            $response['assets']['total'] = (float) ($cash + $receivables);
+        }
+
+        return response()->json($response);
     }
 
     /**
@@ -353,9 +394,10 @@ class FinancialReportController extends Controller
             ->get()
             ->keyBy('period');
 
+        $canViewCosts = $request->user()->hasPermissionTo('invoices.view_costs');
         $allPeriods = $revenues->keys()->merge($expenses->keys())->unique()->sort();
 
-        $result = $allPeriods->map(function ($periodKey) use ($revenues, $expenses) {
+        $result = $allPeriods->map(function ($periodKey) use ($revenues, $expenses, $canViewCosts) {
             $revenue = $revenues->get($periodKey);
             $expense = $expenses->get($periodKey);
             
@@ -364,13 +406,18 @@ class FinancialReportController extends Controller
             $profit = $revenueAmount - $expenseAmount;
             $margin = $revenueAmount > 0 ? round(($profit / $revenueAmount) * 100, 2) : 0;
             
-            return [
+            $item = [
                 'period' => $periodKey,
                 'revenue' => $revenueAmount,
-                'expenses' => $expenseAmount,
-                'profit' => $profit,
-                'margin' => $margin
             ];
+
+            if ($canViewCosts) {
+                $item['expenses'] = $expenseAmount;
+                $item['profit'] = $profit;
+                $item['margin'] = $margin;
+            }
+
+            return $item;
         })->values();
 
         return response()->json($result);
