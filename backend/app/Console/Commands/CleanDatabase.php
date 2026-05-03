@@ -4,7 +4,21 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use App\Models\Invoice;
+use App\Models\InvoiceItem;
+use App\Models\InvoicePayment;
+use App\Models\ItemCost;
+use App\Models\SupplierPayment;
+use App\Models\Expense;
+use App\Models\Withdrawal;
+use App\Models\CashMovement;
+use App\Models\CashBalance;
+use App\Models\InventoryItem;
+use App\Models\InventoryMovement;
+use App\Models\Debt;
+use App\Models\DebtRepayment;
+use App\Models\ActivityLog;
+use App\Models\Supplier;
 
 class CleanDatabase extends Command
 {
@@ -13,97 +27,98 @@ class CleanDatabase extends Command
      *
      * @var string
      */
-    protected $signature = 'db:clean {--force : Force the operation without confirmation}';
+    protected $signature = 'db:clean-full';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Clean all database tables except users table';
+    protected $description = 'Clean all transactions while keeping core data (Users, Products, Suppliers, Customers)';
 
     /**
      * Execute the console command.
      */
     public function handle()
     {
-        if (!$this->option('force')) {
-            if (!$this->confirm('This will delete all data except users. Do you want to continue?')) {
-                $this->info('Operation cancelled.');
-                return;
-            }
+        $this->warn('!!! WARNING: THIS WILL DELETE ALL TRANSACTIONS, INVOICES, EXPENSES, AND FINANCIAL HISTORY !!!');
+        $this->warn('Core data (Users, Products, Suppliers, Customers) will be preserved.');
+        
+        if (!$this->confirm('Are you absolutely sure you want to proceed?')) {
+            $this->info('Operation cancelled.');
+            return;
         }
 
         $this->info('Starting database cleanup...');
 
-        // Get database driver
-        $driver = DB::getDriverName();
+        DB::beginTransaction();
 
-        // Disable foreign key checks based on driver
-        if ($driver === 'mysql') {
+        try {
+            // Disable foreign key checks for truncation
             DB::statement('SET FOREIGN_KEY_CHECKS=0;');
-        } elseif ($driver === 'sqlite') {
-            DB::statement('PRAGMA foreign_keys=OFF;');
-        }
 
-        // Get all tables based on driver
-        if ($driver === 'mysql') {
-            $tables = DB::select('SHOW TABLES');
-            $databaseName = DB::getDatabaseName();
-            $tableKey = "Tables_in_{$databaseName}";
-        } elseif ($driver === 'sqlite') {
-            $tables = DB::select("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
-            $tableKey = 'name';
-        } else {
-            $this->error("Unsupported database driver: {$driver}");
-            return Command::FAILURE;
-        }
+            // 1. Clear Invoices and related
+            InvoiceItem::truncate();
+            InvoicePayment::truncate();
+            Invoice::truncate();
+            $this->line('✓ Invoices and payments cleared.');
 
-        // Tables to skip
-        $skipTables = [
-            'users',
-            'migrations',
-            'cache',
-            'cache_locks',
-            'sessions',
-            'jobs',
-            'job_batches',
-            'failed_jobs'
-        ];
+            // 2. Clear Supplier related transactions
+            ItemCost::truncate();
+            SupplierPayment::truncate();
+            $this->line('✓ Supplier transactions cleared.');
 
-        $cleanedTables = [];
+            // 3. Clear Expenses and Withdrawals
+            Expense::truncate();
+            Withdrawal::truncate();
+            $this->line('✓ Expenses and withdrawals cleared.');
 
-        foreach ($tables as $table) {
-            $tableName = $table->$tableKey;
-            
-            // Skip protected tables
-            if (in_array($tableName, $skipTables)) {
-                $this->warn("Skipped: {$tableName}");
-                continue;
+            // 4. Clear Cash History
+            CashMovement::truncate();
+            $this->line('✓ Cash movements cleared.');
+
+            // 5. Reset Cash Balance
+            $balance = CashBalance::first();
+            if ($balance) {
+                $balance->update(['cash_balance' => 0, 'bank_balance' => 0]);
+            } else {
+                CashBalance::create(['cash_balance' => 0, 'bank_balance' => 0]);
             }
+            $this->line('✓ Cash balance reset to 0.');
 
-            // Truncate table
-            try {
-                DB::table($tableName)->truncate();
-                $cleanedTables[] = $tableName;
-                $this->info("Cleaned: {$tableName}");
-            } catch (\Exception $e) {
-                $this->error("Error cleaning {$tableName}: " . $e->getMessage());
+            // 6. Clear Inventory History
+            InventoryMovement::truncate();
+            $this->line('✓ Inventory movements cleared.');
+
+            // 7. Reset Inventory Quantities (materials)
+            InventoryItem::query()->update(['current_quantity' => 0]);
+            $this->line('✓ Inventory items quantity reset to 0.');
+
+            // 8. Clear Debts (Non-invoice debts)
+            DebtRepayment::truncate();
+            Debt::truncate();
+            $this->line('✓ Debts cleared.');
+
+            // 9. Clear Logs
+            ActivityLog::truncate();
+            $this->line('✓ Activity logs cleared.');
+
+            // 10. Recalculate Supplier Balances (Should be 0 now)
+            foreach (Supplier::all() as $supplier) {
+                $supplier->update(['total_debt' => 0]);
             }
-        }
+            $this->line('✓ Supplier balances reset to 0.');
 
-        // Re-enable foreign key checks based on driver
-        if ($driver === 'mysql') {
+            // Re-enable foreign key checks
             DB::statement('SET FOREIGN_KEY_CHECKS=1;');
-        } elseif ($driver === 'sqlite') {
-            DB::statement('PRAGMA foreign_keys=ON;');
+
+            DB::commit();
+            $this->info('Database cleaned successfully! Core data preserved.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+            $this->error('An error occurred: ' . $e->getMessage());
         }
-
-        $this->newLine();
-        $this->info('Database cleanup completed!');
-        $this->info('Total tables cleaned: ' . count($cleanedTables));
-        $this->info('Users table preserved.');
-
-        return Command::SUCCESS;
     }
 }
