@@ -35,10 +35,6 @@ class InvoiceController extends Controller
             $query->where('status', $request->status);
         }
 
-        if ($request->filled('is_preliminary')) {
-            $query->where('is_preliminary', $request->boolean('is_preliminary'));
-        }
-
         if ($request->has('customer_id')) {
             $query->where('customer_id', $request->customer_id);
         }
@@ -65,7 +61,6 @@ class InvoiceController extends Controller
             'delivery_date' => 'nullable|date',
             'discount' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string',
-            'is_preliminary' => 'nullable|boolean',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'nullable|exists:products,id',
             'items.*.product_name' => 'nullable|string|max:200',
@@ -88,7 +83,6 @@ class InvoiceController extends Controller
                 'delivery_date' => $validated['delivery_date'] ?? null,
                 'discount' => $validated['discount'] ?? 0,
                 'notes' => $validated['notes'] ?? null,
-                'is_preliminary' => $validated['is_preliminary'] ?? false,
             ]);
 
             foreach ($validated['items'] as $itemData) {
@@ -139,26 +133,6 @@ class InvoiceController extends Controller
         ActivityLog::log('create', 'invoices', "إنشاء فاتورة جديدة: {$invoice->invoice_number}", $invoice->id);
 
         return response()->json($invoice->load(['customer', 'items.costs', 'payments']), 201);
-    }
-
-    public function finalize(Invoice $invoice): JsonResponse
-    {
-        if (!$invoice->is_preliminary) {
-            return response()->json([
-                'message' => 'الفاتورة نهائية بالفعل',
-            ], 422);
-        }
-
-        $invoice->update(['is_preliminary' => false]);
-
-        ActivityLog::log(
-            'update',
-            'invoices',
-            "تحويل الفاتورة إلى نهائية: {$invoice->invoice_number}",
-            $invoice->id
-        );
-
-        return response()->json($invoice->fresh()->load(['customer', 'items.costs', 'payments']));
     }
 
     public function show(Invoice $invoice): JsonResponse

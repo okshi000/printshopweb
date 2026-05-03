@@ -76,13 +76,10 @@ export default function CustomersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
 
-  const [sortBy] = useState('name');
-  const [sortDir] = useState('asc');
-
   const { data, isLoading, error, refetch } = useQuery<PaginatedResponse<Customer>>({
-    queryKey: ['customers', page, search, sortBy, sortDir],
+    queryKey: ['customers', page, search],
     queryFn: async () => {
-      const res = await customersApi.list({ page, search, per_page: 10, sort_by: sortBy, sort_dir: sortDir });
+      const res = await customersApi.list({ page, search, per_page: 10 });
       return res.data;
     },
   });

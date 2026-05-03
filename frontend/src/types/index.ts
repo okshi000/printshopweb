@@ -95,7 +95,6 @@ export interface Invoice {
   customer_id: number;
   invoice_date: string;
   delivery_date: string | null;
-  is_preliminary?: boolean;
   status: 'new' | 'in_progress' | 'ready' | 'delivered' | 'cancelled' | 'draft' | 'pending' | 'partial' | 'paid';
   subtotal: number;
   discount: number;

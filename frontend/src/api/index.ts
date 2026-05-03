@@ -99,7 +99,6 @@ export const invoicesApi = {
   update: (id: number, data: Record<string, unknown>) => api.put(`/invoices/${id}`, data),
   delete: (id: number) => api.delete(`/invoices/${id}`),
   updateStatus: (id: number, status: string) => api.patch(`/invoices/${id}/status`, { status }),
-  finalize: (id: number) => api.patch(`/invoices/${id}/finalize`, {}),
   addPayment: (id: number, data: Record<string, unknown>) => api.post(`/invoices/${id}/payments`, data),
   statistics: (params?: Record<string, unknown>) => api.get('/invoices-statistics', { params }),
 };

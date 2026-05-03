@@ -14,7 +14,6 @@ class Invoice extends Model
         'invoice_date',
         'delivery_date',
         'status',
-        'is_preliminary',
         'subtotal',
         'discount',
         'total',
@@ -28,7 +27,6 @@ class Invoice extends Model
     protected $casts = [
         'invoice_date' => 'date',
         'delivery_date' => 'date',
-        'is_preliminary' => 'boolean',
         'subtotal' => 'decimal:2',
         'discount' => 'decimal:2',
         'total' => 'decimal:2',

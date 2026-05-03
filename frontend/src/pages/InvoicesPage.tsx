@@ -223,43 +223,45 @@ export default function InvoicesPage() {
         const invoiceDate = formatDate(invoice.invoice_date || invoice.created_at);
         const items = invoice.items || [];
 
+        const invoiceRow: InvoiceExportRow = {
+          'رقم الفاتورة': invoice.invoice_number,
+          'العميل': invoice.customer?.name || 'عميل نقدي',
+          'التاريخ': invoiceDate,
+          'الإجمالي': total,
+          'المدفوع': paid,
+          'المتبقي': remaining,
+          'حالة الفاتورة': getStatusLabel(invoice.status),
+          'حالة الدفع': getPaymentStatusLabel(paymentStatus),
+          'المنتج': '',
+          'الكمية': null,
+          'سعر الوحدة': null,
+        };
+
         if (items.length === 0) {
-          return [
-            {
-              'رقم الفاتورة': invoice.invoice_number,
-              'العميل': invoice.customer?.name || 'عميل نقدي',
-              'التاريخ': invoiceDate,
-              'الإجمالي': total,
-              'المدفوع': paid,
-              'المتبقي': remaining,
-              'حالة الفاتورة': getStatusLabel(invoice.status),
-              'حالة الدفع': getPaymentStatusLabel(paymentStatus),
-              'المنتج': '',
-              'الكمية': null,
-              'سعر الوحدة': null,
-            },
-          ];
+          return [invoiceRow];
         }
 
-        return items.map((item, index) => {
+        const itemRows: InvoiceExportRow[] = items.map((item) => {
           const quantity = parseFloat(String(item.quantity || 0));
           const unitPrice = parseFloat(String(item.unit_price || 0));
           const productName = item.product_name || item.description || 'منتج غير محدد';
 
           return {
-            'رقم الفاتورة': index === 0 ? invoice.invoice_number : '',
-            'العميل': index === 0 ? (invoice.customer?.name || 'عميل نقدي') : '',
-            'التاريخ': index === 0 ? invoiceDate : '',
-            'الإجمالي': index === 0 ? total : null,
-            'المدفوع': index === 0 ? paid : null,
-            'المتبقي': index === 0 ? remaining : null,
-            'حالة الفاتورة': index === 0 ? getStatusLabel(invoice.status) : '',
-            'حالة الدفع': index === 0 ? getPaymentStatusLabel(paymentStatus) : '',
+            'رقم الفاتورة': '',
+            'العميل': '',
+            'التاريخ': '',
+            'الإجمالي': null,
+            'المدفوع': null,
+            'المتبقي': null,
+            'حالة الفاتورة': '',
+            'حالة الدفع': '',
             'المنتج': productName,
             'الكمية': quantity,
             'سعر الوحدة': unitPrice,
           };
         });
+
+        return [invoiceRow, ...itemRows];
       });
 
       const worksheet = XLSX.utils.json_to_sheet(rows, { header: exportHeaders });
