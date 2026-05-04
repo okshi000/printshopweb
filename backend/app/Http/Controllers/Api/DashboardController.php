@@ -15,7 +15,7 @@ use Illuminate\Http\JsonResponse;
 
 class DashboardController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         $today = Carbon::today();
         $thisMonth = Carbon::now()->startOfMonth();
