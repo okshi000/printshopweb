@@ -57,7 +57,7 @@ interface InvoiceItem {
   item_notes: string
   costs: ItemCost[]
 }
-
+export default function CreateInvoicePage() {
   const navigate = useNavigate()
   const { user, hasPermission } = useAuth()
   const { id } = useParams<{ id: string }>()
