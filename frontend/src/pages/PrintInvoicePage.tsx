@@ -225,6 +225,26 @@ const PrintableInvoice = ({ invoice }: PrintableInvoiceProps) => {
       color: '#666',
       fontSize: '13px',
     },
+    stampSection: {
+      marginTop: '24px',
+      textAlign: 'center' as const,
+      breakInside: 'avoid' as const,
+    },
+    stampLabel: {
+      fontSize: '16px',
+      fontWeight: 'bold' as const,
+      color: '#333',
+      marginBottom: '10px',
+    },
+    stampImage: {
+      display: 'block',
+      maxWidth: '180px',
+      maxHeight: '180px',
+      width: 'auto',
+      height: 'auto',
+      margin: '0 auto',
+      objectFit: 'contain' as const,
+    },
   }
 
   return (
@@ -347,6 +367,16 @@ const PrintableInvoice = ({ invoice }: PrintableInvoiceProps) => {
         </div>
       )}
 
+      {/* Stamp */}
+      <div className="print-only" style={styles.stampSection}>
+        <div style={styles.stampLabel}>الختم</div>
+        <img
+          src={encodeURI('/ختم علبة.png')}
+          alt="الختم"
+          style={styles.stampImage}
+        />
+      </div>
+
       {/* Footer */}
       <div style={styles.footer}>
         <p>شكراً لتعاملكم معنا</p>
@@ -409,8 +439,10 @@ export default function PrintInvoicePage() {
     <>
       {/* Print Controls - Hidden when printing */}
       <style>{`
+        .print-only { display: none !important; }
         @media print {
           .no-print { display: none !important; }
+          .print-only { display: block !important; }
           @page { size: A4; margin: 10mm; }
         }
       `}</style>
