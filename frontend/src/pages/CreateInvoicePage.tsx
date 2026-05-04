@@ -59,7 +59,7 @@ interface InvoiceItem {
 }
 export default function CreateInvoicePage() {
   const navigate = useNavigate()
-  const { user, hasPermission } = useAuth()
+  const { hasPermission } = useAuth()
   const { id } = useParams<{ id: string }>()
   const [searchParams] = useSearchParams()
   const isEditMode = !!id
