@@ -24,6 +24,7 @@ import AccountantDashboardPage from './pages/accountant/AccountantDashboardPage'
 import IncomeStatementPage from './pages/accountant/IncomeStatementPage';
 import BalanceSheetPage from './pages/accountant/BalanceSheetPage';
 import UsersPage from './pages/users/UsersPage';
+import UnauthorizedPage from './pages/UnauthorizedPage';
 import CustomerViewPage from './pages/customers/CustomerViewPage';
 import SupplierViewPage from './pages/suppliers/SupplierViewPage';
 import {
@@ -62,7 +63,17 @@ function App() {
                     </ProtectedRoute>
                   }
                 >
-                  <Route index element={<DashboardPage />} />
+                  <Route
+                    index
+                    element={
+                      <ProtectedRoute
+                        permission="dashboard.view"
+                        redirectTo="/unauthorized"
+                      >
+                        <DashboardPage />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route path="customers" element={<CustomersPage />} />
                   <Route path="customers/:id" element={<CustomerViewPage />} />
                   <Route path="suppliers" element={<SuppliersPage />} />
@@ -89,6 +100,7 @@ function App() {
                   <Route path="users" element={<UsersPage />} />
                 </Route>
 
+                <Route path="/unauthorized" element={<UnauthorizedPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </BrowserRouter>
