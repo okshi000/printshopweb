@@ -63,7 +63,7 @@ const navSections: NavSection[] = [
   {
     title: 'الرئيسية',
     items: [
-      { icon: LayoutDashboard, label: 'لوحة التحكم', to: '/', permission: 'dashboard.view' },
+      { icon: LayoutDashboard, label: 'لوحة التحكم', to: '/dashboard', permission: 'dashboard.view' },
       { icon: FileText, label: 'الفواتير', to: '/invoices', permission: 'invoices.view' },
       { icon: Plus, label: 'فاتورة جديدة', to: '/invoices/create', color: 'success', permission: 'invoices.create' },
     ],

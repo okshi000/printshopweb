@@ -4,6 +4,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import DefaultRedirect from './components/DefaultRedirect';
 import ErrorBoundary from './components/ErrorBoundary';
 import MainLayout from './layouts/MainLayout';
 import LoginPage from './pages/auth/LoginPage';
@@ -24,8 +25,8 @@ import AccountantDashboardPage from './pages/accountant/AccountantDashboardPage'
 import IncomeStatementPage from './pages/accountant/IncomeStatementPage';
 import BalanceSheetPage from './pages/accountant/BalanceSheetPage';
 import UsersPage from './pages/users/UsersPage';
-import UnauthorizedPage from './pages/UnauthorizedPage';
 import CustomerViewPage from './pages/customers/CustomerViewPage';
+import NoAccessPage from './pages/NoAccessPage';
 import SupplierViewPage from './pages/suppliers/SupplierViewPage';
 import {
   ReportsOverview,
@@ -54,7 +55,7 @@ function App() {
             <BrowserRouter>
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
-                
+
                 <Route
                   path="/"
                   element={
@@ -63,17 +64,19 @@ function App() {
                     </ProtectedRoute>
                   }
                 >
+                  {/* index: يُوجَّه المستخدم لأول صفحة متاحة له تلقائياً */}
+                  <Route index element={<DefaultRedirect />} />
+
+                  {/* لوحة التحكم — محمية بصلاحية dashboard.view */}
                   <Route
-                    index
+                    path="dashboard"
                     element={
-                      <ProtectedRoute
-                        permission="dashboard.view"
-                        redirectTo="/unauthorized"
-                      >
+                      <ProtectedRoute permission="dashboard.view">
                         <DashboardPage />
                       </ProtectedRoute>
                     }
                   />
+
                   <Route path="customers" element={<CustomersPage />} />
                   <Route path="customers/:id" element={<CustomerViewPage />} />
                   <Route path="suppliers" element={<SuppliersPage />} />
@@ -85,7 +88,8 @@ function App() {
                   <Route path="invoices/:id/edit" element={<CreateInvoicePage />} />
                   <Route path="invoices/:id/print" element={<PrintInvoicePage />} />
                   <Route path="cash" element={<CashPage />} />
-                  <Route path="expenses" element={<ExpensesPage />} />                  <Route path="inventory" element={<InventoryPage />} />
+                  <Route path="expenses" element={<ExpensesPage />} />
+                  <Route path="inventory" element={<InventoryPage />} />
                   <Route path="debts" element={<DebtsPage />} />
                   <Route path="reports" element={<ReportsOverview />} />
                   <Route path="reports/financial" element={<FinancialReports />} />
@@ -98,9 +102,9 @@ function App() {
                   <Route path="accountant/income-statement" element={<IncomeStatementPage />} />
                   <Route path="accountant/balance-sheet" element={<BalanceSheetPage />} />
                   <Route path="users" element={<UsersPage />} />
+                  <Route path="no-access" element={<NoAccessPage />} />
                 </Route>
 
-                <Route path="/unauthorized" element={<UnauthorizedPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </BrowserRouter>
