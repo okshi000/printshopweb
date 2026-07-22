@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -16,6 +16,9 @@ import {
   Receipt,
   Download,
   X,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
@@ -68,6 +71,7 @@ export default function InvoicesPage() {
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [isExporting, setIsExporting] = useState(false);
+  const [sortByDeliveryDate, setSortByDeliveryDate] = useState<'asc' | 'desc' | ''>('');
 
   // Debounce search
   const handleSearchChange = (value: string) => {
@@ -80,13 +84,17 @@ export default function InvoicesPage() {
   };
 
   const { data, isLoading, error } = useQuery<PaginatedResponse<Invoice>>({
-    queryKey: ['invoices', page, invoiceStatusFilter, debouncedSearch, dateFrom, dateTo],
+    queryKey: ['invoices', page, invoiceStatusFilter, debouncedSearch, dateFrom, dateTo, sortByDeliveryDate],
     queryFn: async () => {
       const params: Record<string, string | number> = { page, per_page: 10 };
       if (invoiceStatusFilter) params.status = invoiceStatusFilter;
       if (debouncedSearch) params.search = debouncedSearch;
       if (dateFrom) params.date_from = dateFrom.toISOString().split('T')[0];
       if (dateTo) params.date_to = dateTo.toISOString().split('T')[0];
+      if (sortByDeliveryDate) {
+        params.sort_by = 'delivery_date';
+        params.sort_direction = sortByDeliveryDate;
+      }
       const res = await invoicesApi.list(params);
       return res.data;
     },
@@ -115,10 +123,11 @@ export default function InvoicesPage() {
     setDebouncedSearch('');
     setDateFrom(undefined);
     setDateTo(undefined);
+    setSortByDeliveryDate('');
     setPage(1);
   };
 
-  const hasActiveFilters = invoiceStatusFilter || paymentStatusFilter || dateFrom || dateTo || searchTerm;
+  const hasActiveFilters = invoiceStatusFilter || paymentStatusFilter || dateFrom || dateTo || searchTerm || sortByDeliveryDate;
 
   const exportHeaders = [
     'رقم الفاتورة',
@@ -419,6 +428,28 @@ export default function InvoicesPage() {
                 </PopoverContent>
               </Popover>
 
+              <Button
+                variant={sortByDeliveryDate ? 'default' : 'outline'}
+                className={cn('gap-2', sortByDeliveryDate && 'bg-orange-500 hover:bg-orange-600 text-white')}
+                onClick={() => {
+                  setSortByDeliveryDate((prev) => {
+                    if (prev === '') return 'asc';
+                    if (prev === 'asc') return 'desc';
+                    return '';
+                  });
+                  setPage(1);
+                }}
+              >
+                {sortByDeliveryDate === 'asc' ? (
+                  <ArrowUp className="h-4 w-4" />
+                ) : sortByDeliveryDate === 'desc' ? (
+                  <ArrowDown className="h-4 w-4" />
+                ) : (
+                  <ArrowUpDown className="h-4 w-4" />
+                )}
+                تاريخ التسليم
+              </Button>
+
               {hasActiveFilters && (
                 <Button variant="ghost" size="icon" onClick={clearFilters}>
                   <X className="h-4 w-4" />
@@ -459,6 +490,7 @@ export default function InvoicesPage() {
                     <TableHead className="font-semibold">رقم الفاتورة</TableHead>
                     <TableHead className="font-semibold">العميل</TableHead>
                     <TableHead className="font-semibold">التاريخ</TableHead>
+                    <TableHead className="font-semibold">تاريخ التسليم</TableHead>
                     <TableHead className="font-semibold">الإجمالي</TableHead>
                     <TableHead className="font-semibold">المدفوع</TableHead>
                     <TableHead className="font-semibold">المتبقي</TableHead>
@@ -502,6 +534,15 @@ export default function InvoicesPage() {
                             <span className="text-sm text-muted-foreground">
                               {formatDate(invoice.invoice_date)}
                             </span>
+                          </TableCell>
+                          <TableCell>
+                            {invoice.delivery_date ? (
+                              <span className="text-sm font-medium text-orange-600 dark:text-orange-400">
+                                {formatDate(invoice.delivery_date)}
+                              </span>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">غير محدد</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <span className="font-semibold">

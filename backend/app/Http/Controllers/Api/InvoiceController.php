@@ -47,8 +47,23 @@ class InvoiceController extends Controller
             $query->whereDate('invoice_date', '<=', $request->date_to);
         }
 
-        $invoices = $query->orderBy('created_at', 'desc')
-            ->paginate($request->per_page ?? 10);
+        // Sorting
+        $sortBy = $request->sort_by;
+        $sortDirection = in_array($request->sort_direction, ['asc', 'desc']) ? $request->sort_direction : 'asc';
+        $allowedSortFields = ['delivery_date', 'invoice_date', 'total', 'created_at'];
+
+        if ($sortBy && in_array($sortBy, $allowedSortFields)) {
+            if ($sortBy === 'delivery_date') {
+                // Push NULLs to the end regardless of sort direction
+                $query->orderByRaw('ISNULL(delivery_date), delivery_date ' . $sortDirection);
+            } else {
+                $query->orderBy($sortBy, $sortDirection);
+            }
+        } else {
+            $query->orderBy('created_at', 'desc');
+        }
+
+        $invoices = $query->paginate($request->per_page ?? 10);
 
         // Hide costs if user doesn't have permission
         if (!$request->user()->hasPermissionTo('invoices.view_costs')) {
