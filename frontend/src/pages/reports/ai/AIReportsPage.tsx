@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Progress } from '@/components/ui/progress';
 import {
   Brain,
   Sparkles,
@@ -22,8 +21,6 @@ import {
   XCircle,
   Lightbulb,
   MessageCircle,
-  BarChart3,
-  ArrowRight,
   Bot,
   User,
   RefreshCw,
