@@ -28,7 +28,7 @@ class AiReportController extends Controller
      */
     private function getApiKey(): string
     {
-        return env('GEMINI_API_KEY', '');
+        return config('services.gemini.api_key', env('GEMINI_API_KEY', ''));
     }
 
     /**
