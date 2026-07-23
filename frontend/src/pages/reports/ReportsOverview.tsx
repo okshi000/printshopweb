@@ -19,6 +19,7 @@ import {
   Download,
   RefreshCw,
   Wallet,
+  Brain,
 } from 'lucide-react';
 import { StatsCard } from '@/components/reports/cards';
 import { financialApi } from '@/api/reports/financial.api';
@@ -138,6 +139,20 @@ export const ReportsOverview: React.FC = () => {
         { id: 'inflows', name: 'الإيداعات' },
         { id: 'outflows', name: 'المسحوبات' },
         { id: 'balances', name: 'أرصدة الخزائن' },
+      ],
+    },
+    {
+      id: 'ai',
+      title: 'تقرير الذكاء الاصطناعي',
+      description: 'تحليل مالي ذكي ورؤى لحظية مدعومة بـ AI',
+      icon: <Brain className="h-8 w-8" />,
+      gradient: 'bg-gradient-to-br from-violet-500 to-purple-600',
+      path: '/reports/ai',
+      reports: [
+        { id: 'ai-analysis', name: 'التحليل الذكي' },
+        { id: 'ai-insights', name: 'الرؤى المالية' },
+        { id: 'ai-recommendations', name: 'التوصيات' },
+        { id: 'ai-chat', name: 'المحادثة الذكية' },
       ],
     },
   ];
@@ -373,6 +388,15 @@ export const ReportsOverview: React.FC = () => {
               >
                 <CreditCard className="h-4 w-4" />
                 التدفق النقدي
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => navigate('/reports/ai')}
+                className="gap-2 border-violet-300 text-violet-700 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-950/30"
+              >
+                <Brain className="h-4 w-4" />
+                تقرير الذكاء الاصطناعي
               </Button>
             </div>
           </CardContent>

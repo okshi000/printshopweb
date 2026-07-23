@@ -166,6 +166,13 @@ Route::middleware(['auth:sanctum', 'api.permission'])->group(function () {
             Route::get('/repayment-history', [\App\Http\Controllers\Reports\CustomerReportController::class, 'repaymentHistory']);
         });
         
+        // AI Reports - تقارير الذكاء الاصطناعي
+        Route::prefix('ai')->group(function () {
+            Route::get('/quick-insights', [\App\Http\Controllers\Api\AiReportController::class, 'quickInsights']);
+            Route::post('/analyze', [\App\Http\Controllers\Api\AiReportController::class, 'analyze']);
+            Route::post('/chat', [\App\Http\Controllers\Api\AiReportController::class, 'chat']);
+        });
+
         // Cash Flow Reports - تقارير التدفق النقدي
         Route::prefix('cash-flow')->group(function () {
             Route::get('/summary', [\App\Http\Controllers\Reports\CashflowReportController::class, 'summary']);

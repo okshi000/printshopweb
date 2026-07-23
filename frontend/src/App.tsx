@@ -35,6 +35,7 @@ import {
   InventoryReports,
   CustomersReports,
   CashflowReports,
+  AIReportsPage,
 } from './pages/reports';
 
 const queryClient = new QueryClient({
@@ -97,6 +98,7 @@ function App() {
                   <Route path="reports/inventory" element={<InventoryReports />} />
                   <Route path="reports/customers" element={<CustomersReports />} />
                   <Route path="reports/cashflow" element={<CashflowReports />} />
+                  <Route path="reports/ai" element={<AIReportsPage />} />
                   <Route path="activity" element={<ActivityPage />} />
                   <Route path="accountant" element={<AccountantDashboardPage />} />
                   <Route path="accountant/income-statement" element={<IncomeStatementPage />} />
