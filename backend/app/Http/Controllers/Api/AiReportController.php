@@ -19,16 +19,25 @@ use Illuminate\Support\Facades\Log;
 class AiReportController extends Controller
 {
     /**
-     * Gemini API endpoint
+     * Gemini API base URL
      */
-    private string $geminiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+    private string $geminiBaseUrl = 'https://generativelanguage.googleapis.com/v1beta/models';
+
+    /**
+     * النماذج المتاحة (بالترتيب: الأفضل أولاً)
+     */
+    private array $models = [
+        'gemini-2.0-flash',
+        'gemini-1.5-flash',
+        'gemini-2.0-flash-lite',
+    ];
 
     /**
      * الحصول على مفتاح API
      */
     private function getApiKey(): string
     {
-        return config('services.gemini.api_key', env('GEMINI_API_KEY', ''));
+        return config('services.gemini.api_key', '');
     }
 
     /**
@@ -162,46 +171,74 @@ class AiReportController extends Controller
     }
 
     /**
-     * إرسال طلب لـ Gemini API
+     * إرسال طلب لـ Gemini API مع دعم fallback لعدة نماذج
      */
     private function callGemini(string $prompt): ?string
     {
         $apiKey = $this->getApiKey();
 
         if (empty($apiKey)) {
-            Log::error('Gemini API key is not configured');
+            Log::error('Gemini API key is not configured. Check GEMINI_API_KEY in .env and run: php artisan config:cache');
             return null;
         }
 
-        try {
-            $response = Http::timeout(30)->post("{$this->geminiUrl}?key={$apiKey}", [
-                'contents' => [
-                    [
-                        'parts' => [
-                            ['text' => $prompt],
+        $lastError = null;
+
+        // محاولة كل نموذج
+        foreach ($this->models as $model) {
+            try {
+                $url = "{$this->geminiBaseUrl}/{$model}:generateContent?key={$apiKey}";
+
+                $response = Http::timeout(60)->post($url, [
+                    'contents' => [
+                        [
+                            'parts' => [
+                                ['text' => $prompt],
+                            ],
                         ],
                     ],
-                ],
-                'generationConfig' => [
-                    'temperature' => 0.7,
-                    'maxOutputTokens' => 4096,
-                ],
-            ]);
+                    'generationConfig' => [
+                        'temperature' => 0.7,
+                        'maxOutputTokens' => 4096,
+                    ],
+                ]);
 
-            if ($response->successful()) {
-                $data = $response->json();
-                return $data['candidates'][0]['content']['parts'][0]['text'] ?? null;
+                if ($response->successful()) {
+                    $data = $response->json();
+                    $text = $data['candidates'][0]['content']['parts'][0]['text'] ?? null;
+                    if ($text) {
+                        Log::info("Gemini API success with model: {$model}");
+                        return $text;
+                    }
+                }
+
+                $status = $response->status();
+                $body = $response->body();
+
+                // إذا كان الخطأ 429 (rate limit)، جرب النموذج التالي
+                if ($status === 429) {
+                    Log::warning("Gemini model {$model} rate limited (429), trying next model...");
+                    $lastError = "تم تجاوز الحد المسموح لنموذج {$model}";
+                    sleep(2);
+                    continue;
+                }
+
+                // أخطاء أخرى
+                Log::error("Gemini API error with model {$model}", [
+                    'status' => $status,
+                    'body' => substr($body, 0, 500),
+                ]);
+                $lastError = "خطأ HTTP {$status}";
+
+            } catch (\Exception $e) {
+                Log::error("Gemini API exception with model {$model}: " . $e->getMessage());
+                $lastError = $e->getMessage();
+                continue;
             }
-
-            Log::error('Gemini API error', [
-                'status' => $response->status(),
-                'body' => $response->body(),
-            ]);
-            return null;
-        } catch (\Exception $e) {
-            Log::error('Gemini API exception: ' . $e->getMessage());
-            return null;
         }
+
+        Log::error("All Gemini models failed. Last error: {$lastError}");
+        return null;
     }
 
     /**
