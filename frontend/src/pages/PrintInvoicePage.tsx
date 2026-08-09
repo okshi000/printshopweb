@@ -137,7 +137,7 @@ const PrintableInvoice = ({ invoice, settings }: PrintableInvoiceProps) => {
   // Inline styles للتأكد من ظهورها في الطباعة
   const styles = {
     container: {
-      fontFamily: "'Segoe UI', Tahoma, Arial, sans-serif",
+      fontFamily: "'Cairo', 'Segoe UI', Tahoma, Arial, sans-serif",
       direction: 'rtl' as const,
       background: 'white',
       color: '#333',
@@ -473,6 +473,8 @@ export default function PrintInvoicePage() {
     <>
       {/* Print Controls - Hidden when printing */}
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
+        
         .print-only { display: none !important; }
         @media print {
           .no-print { display: none !important; }
