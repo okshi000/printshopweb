@@ -22,6 +22,7 @@ import {
   Printer,
   Menu,
   X,
+  Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -107,6 +108,7 @@ const navSections: NavSection[] = [
   {
     title: 'الإعدادات',
     items: [
+      { icon: Settings, label: 'إعدادات النظام', to: '/settings', permission: 'settings.view' },
       { icon: UserCog, label: 'المستخدمين والصلاحيات', to: '/users', permission: 'users.view' },
       { icon: History, label: 'سجل النشاط', to: '/activity', permission: 'activity.view' },
     ],

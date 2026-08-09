@@ -52,6 +52,8 @@ class DatabaseSeeder extends Seeder
             'activity.view' => 'عرض سجل النشاط',
             'invoices.view_costs' => 'عرض التكاليف والأرباح',
             'invoices.manage_costs' => 'إضافة وتعديل التكاليف',
+            'settings.view' => 'عرض إعدادات النظام',
+            'settings.update' => 'تعديل إعدادات النظام',
         ];
 
         foreach ($permissions as $name => $description) {

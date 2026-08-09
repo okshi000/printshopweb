@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatCurrency } from '@/lib/utils'
 import { invoicesApi } from '../api'
+import { settingsApi, SettingsData } from '../api/settings.api'
 
 // ==================== Types ====================
 interface ItemCost {
@@ -70,8 +71,11 @@ interface Invoice {
 }
 
 // ==================== Constants ====================
-const COMPANY_PHONE = '0910275552'
-const COMPANY_ADDRESS = 'طرابلس، ليبيا'
+const getImageUrl = (path?: string) => {
+  if (!path) return '';
+  const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
+  return `${baseUrl}${path}`;
+};
 
 // ==================== Helpers ====================
 const formatDate = (date: string | null | undefined, formatStr: string, options?: any) => {
@@ -114,13 +118,20 @@ const Logo = () => (
 // ==================== Printable Invoice Component ====================
 interface PrintableInvoiceProps {
   invoice: Invoice
+  settings?: SettingsData
 }
 
-const PrintableInvoice = ({ invoice }: PrintableInvoiceProps) => {
+const PrintableInvoice = ({ invoice, settings }: PrintableInvoiceProps) => {
   const totalAmount = invoice.total || invoice.total_amount || 0
   const subtotal = invoice.subtotal || totalAmount
   const customerPhone = invoice.customer_phone || invoice.phone
   const payments = invoice.payments || []
+  
+  const companyPhone = settings?.company_phone || '0910275552'
+  const companyAddress = settings?.company_address || 'طرابلس، ليبيا'
+  const companyName = settings?.company_name || 'Print Shop System'
+  const companyLogo = settings?.company_logo
+  const companyStamp = settings?.company_stamp
 
   // Inline styles للتأكد من ظهورها في الطباعة
   const styles = {
@@ -251,10 +262,15 @@ const PrintableInvoice = ({ invoice }: PrintableInvoiceProps) => {
     <div style={styles.container}>
       {/* Header */}
       <div style={styles.header}>
-        <Logo />
+        {companyLogo ? (
+          <img src={getImageUrl(companyLogo)} alt={companyName} style={{ height: '120px', width: 'auto', margin: '0 auto 10px', display: 'block', objectFit: 'contain' }} />
+        ) : (
+          <Logo />
+        )}
         <div style={styles.companyInfo}>
-          <p>الهاتف: {COMPANY_PHONE}</p>
-          <p>العنوان: {COMPANY_ADDRESS}</p>
+          <h2 style={{ margin: '0 0 10px 0', fontSize: '20px', color: '#f58220' }}>{companyName}</h2>
+          <p>الهاتف: {companyPhone}</p>
+          <p>العنوان: {companyAddress}</p>
         </div>
       </div>
 
@@ -370,11 +386,19 @@ const PrintableInvoice = ({ invoice }: PrintableInvoiceProps) => {
       {/* Stamp */}
       <div className="print-only" style={styles.stampSection}>
         <div style={styles.stampLabel}>الختم</div>
-        <img
-          src={encodeURI('/ختم علبة.png')}
-          alt="الختم"
-          style={styles.stampImage}
-        />
+        {companyStamp ? (
+          <img
+            src={getImageUrl(companyStamp)}
+            alt="الختم"
+            style={styles.stampImage}
+          />
+        ) : (
+          <img
+            src={encodeURI('/ختم علبة.png')}
+            alt="الختم"
+            style={styles.stampImage}
+          />
+        )}
       </div>
 
       {/* Footer */}
@@ -404,6 +428,15 @@ export default function PrintInvoicePage() {
     enabled: !!id,
   })
 
+  // Fetch settings data
+  const { data: settings, isLoading: isLoadingSettings } = useQuery<SettingsData>({
+    queryKey: ['settings'],
+    queryFn: async () => {
+      const res = await settingsApi.getSettings();
+      return res.data.data;
+    },
+  })
+
   // Print handler using react-to-print
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -411,7 +444,7 @@ export default function PrintInvoicePage() {
   })
 
   // Loading state
-  if (isLoading) {
+  if (isLoading || isLoadingSettings) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -471,7 +504,7 @@ export default function PrintInvoicePage() {
 
       {/* Printable Content */}
       <div ref={printRef}>
-        <PrintableInvoice invoice={invoice} />
+        <PrintableInvoice invoice={invoice} settings={settings} />
       </div>
     </>
   )

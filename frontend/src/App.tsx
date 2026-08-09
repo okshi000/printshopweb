@@ -25,6 +25,7 @@ import AccountantDashboardPage from './pages/accountant/AccountantDashboardPage'
 import IncomeStatementPage from './pages/accountant/IncomeStatementPage';
 import BalanceSheetPage from './pages/accountant/BalanceSheetPage';
 import UsersPage from './pages/users/UsersPage';
+import SettingsPage from './pages/SettingsPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import CustomerViewPage from './pages/customers/CustomerViewPage';
 import SupplierViewPage from './pages/suppliers/SupplierViewPage';
@@ -104,6 +105,15 @@ function App() {
                   <Route path="accountant/income-statement" element={<IncomeStatementPage />} />
                   <Route path="accountant/balance-sheet" element={<BalanceSheetPage />} />
                   <Route path="users" element={<UsersPage />} />
+                  
+                  <Route 
+                    path="settings" 
+                    element={
+                      <ProtectedRoute permission="settings.view">
+                        <SettingsPage />
+                      </ProtectedRoute>
+                    } 
+                  />
                 </Route>
 
                 <Route path="/no-access" element={<UnauthorizedPage />} />

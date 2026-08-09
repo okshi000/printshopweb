@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\AccountantController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\ReportsController;
 
 // Public routes
@@ -117,6 +118,10 @@ Route::middleware(['auth:sanctum', 'api.permission'])->group(function () {
     Route::put('/roles/{role}', [UserController::class, 'updateRole']);
     Route::delete('/roles/{role}', [UserController::class, 'deleteRole']);
     Route::get('/permissions', [UserController::class, 'permissions']);
+
+    // Settings Management - إعدادات النظام
+    Route::get('/settings', [SettingController::class, 'index'])->middleware('permission:settings.view');
+    Route::post('/settings', [SettingController::class, 'update'])->middleware('permission:settings.update');
 
     // Reports - التقارير الجديدة
     Route::prefix('reports')->group(function () {
