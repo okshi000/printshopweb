@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Settings, Save, Image as ImageIcon, Building, Phone, MapPin, Stamp } from 'lucide-react';
 import { toast } from 'sonner';
-import { settingsApi, SettingsData } from '../api/settings.api';
+import { settingsApi, type SettingsData } from '../api/settings.api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';

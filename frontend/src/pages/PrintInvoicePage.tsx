@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatCurrency } from '@/lib/utils'
 import { invoicesApi } from '../api'
-import { settingsApi, SettingsData } from '../api/settings.api'
+import { settingsApi, type SettingsData } from '../api/settings.api'
 
 // ==================== Types ====================
 interface ItemCost {
