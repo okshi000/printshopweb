@@ -13,6 +13,7 @@ export default function SettingsPage() {
     company_name: '',
     company_phone: '',
     company_address: '',
+    primary_color: '#f58220',
   });
 
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -35,6 +36,7 @@ export default function SettingsPage() {
         company_address: data.company_address || '',
         company_logo: data.company_logo,
         company_stamp: data.company_stamp,
+        primary_color: data.primary_color || '#f58220',
       });
     }
   }, [data]);
@@ -61,6 +63,7 @@ export default function SettingsPage() {
     payload.append('company_name', formData.company_name || '');
     payload.append('company_phone', formData.company_phone || '');
     payload.append('company_address', formData.company_address || '');
+    payload.append('primary_color', formData.primary_color || '#f58220');
     
     if (logoFile) {
       payload.append('company_logo', logoFile);
@@ -163,6 +166,26 @@ export default function SettingsPage() {
                     onChange={(e) => setFormData({ ...formData, company_address: e.target.value })}
                     className="pr-10"
                     placeholder="أدخل العنوان"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">اللون الأساسي للفاتورة</label>
+                <div className="flex gap-4 items-center">
+                  <Input
+                    type="color"
+                    value={formData.primary_color || '#f58220'}
+                    onChange={(e) => setFormData({ ...formData, primary_color: e.target.value })}
+                    className="w-16 h-10 p-1 cursor-pointer"
+                  />
+                  <Input
+                    type="text"
+                    value={formData.primary_color || '#f58220'}
+                    onChange={(e) => setFormData({ ...formData, primary_color: e.target.value })}
+                    className="flex-1"
+                    dir="ltr"
+                    placeholder="#f58220"
                   />
                 </div>
               </div>

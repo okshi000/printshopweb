@@ -6,6 +6,7 @@ export interface SettingsData {
   company_address?: string;
   company_stamp?: string;
   company_logo?: string;
+  primary_color?: string;
   [key: string]: string | undefined;
 }
 
