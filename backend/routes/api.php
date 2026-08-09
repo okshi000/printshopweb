@@ -120,8 +120,8 @@ Route::middleware(['auth:sanctum', 'api.permission'])->group(function () {
     Route::get('/permissions', [UserController::class, 'permissions']);
 
     // Settings Management - إعدادات النظام
-    Route::get('/settings', [SettingController::class, 'index'])->middleware('permission:settings.view');
-    Route::post('/settings', [SettingController::class, 'update'])->middleware('permission:settings.update');
+    Route::get('/settings', [SettingController::class, 'index']);
+    Route::post('/settings', [SettingController::class, 'update']);
 
     // Reports - التقارير الجديدة
     Route::prefix('reports')->group(function () {

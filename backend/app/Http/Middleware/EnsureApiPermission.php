@@ -160,6 +160,10 @@ class EnsureApiPermission
             return $method === 'GET' ? 'debts.view' : 'debts.manage';
         }
 
+        if ($root === 'settings') {
+            return $method === 'GET' ? 'settings.view' : 'settings.update';
+        }
+
         return null;
     }
 
