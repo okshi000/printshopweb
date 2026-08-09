@@ -11,5 +11,9 @@ export interface SettingsData {
 
 export const settingsApi = {
   getSettings: () => api.get<{ status: string; data: SettingsData }>('/settings'),
-  updateSettings: (data: FormData) => api.post<{ status: string; message: string; data: SettingsData }>('/settings', data),
+  updateSettings: (data: FormData) => api.post<{ status: string; message: string; data: SettingsData }>('/settings', data, {
+    headers: {
+      'Content-Type': undefined,
+    },
+  }),
 };
