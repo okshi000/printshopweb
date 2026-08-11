@@ -143,79 +143,80 @@ const PrintableInvoice = ({ invoice, settings }: PrintableInvoiceProps) => {
       color: '#333',
       maxWidth: '210mm',
       margin: '0 auto',
-      padding: '20px',
+      padding: '10px 15px',
     },
     header: {
       textAlign: 'center' as const,
-      paddingBottom: '20px',
+      paddingBottom: '10px',
       borderBottom: `3px solid ${primaryColor}`,
-      marginBottom: '25px',
+      marginBottom: '15px',
     },
     companyInfo: {
-      fontSize: '14px',
+      fontSize: '13px',
       color: '#666',
     },
     infoGrid: {
       display: 'grid',
       gridTemplateColumns: '1fr 1fr',
-      gap: '20px',
-      marginBottom: '30px',
+      gap: '15px',
+      marginBottom: '20px',
     },
     infoBox: {
       border: '1px solid #ddd',
       borderRadius: '8px',
-      padding: '15px',
+      padding: '10px 15px',
       background: '#fafafa',
     },
     infoBoxTitle: {
-      fontSize: '16px',
+      fontSize: '15px',
       fontWeight: 'bold' as const,
       color: primaryColor,
-      marginBottom: '10px',
-      paddingBottom: '8px',
+      marginBottom: '8px',
+      paddingBottom: '5px',
       borderBottom: '1px solid #eee',
     },
     sectionTitle: {
-      fontSize: '18px',
+      fontSize: '16px',
       fontWeight: 'bold' as const,
       color: '#333',
-      margin: '25px 0 15px',
-      paddingBottom: '8px',
+      margin: '15px 0 10px',
+      paddingBottom: '5px',
       borderBottom: `2px solid ${primaryColor}`,
     },
     table: {
       width: '100%',
       borderCollapse: 'collapse' as const,
-      marginBottom: '25px',
+      marginBottom: '15px',
     },
     tableHeader: {
       background: primaryColor,
       color: 'white',
-      padding: '12px 10px',
+      padding: '8px 10px',
       textAlign: 'right' as const,
       fontWeight: 'bold' as const,
-      fontSize: '14px',
+      fontSize: '13px',
     },
     tableCell: {
-      padding: '10px',
+      padding: '8px 10px',
       textAlign: 'right' as const,
       borderBottom: '1px solid #ddd',
-      fontSize: '14px',
+      fontSize: '13px',
     },
     paymentsTableHeader: {
       background: '#4caf50',
       color: 'white',
-      padding: '10px',
+      padding: '8px 10px',
       textAlign: 'right' as const,
       fontWeight: 'bold' as const,
+      fontSize: '13px',
     },
     totalsSection: {
       marginRight: 'auto',
-      width: '320px',
-      marginTop: '20px',
+      width: '280px',
+      marginTop: '10px',
     },
     grandTotal: {
-      fontSize: '18px',
+      fontSize: '16px',
       fontWeight: 'bold' as const,
       color: primaryColor,
       background: '#fff8e1',
@@ -225,33 +226,33 @@ const PrintableInvoice = ({ invoice, settings }: PrintableInvoiceProps) => {
       background: '#e3f2fd',
       border: '1px solid #90caf9',
       borderRadius: '8px',
-      padding: '15px',
-      marginTop: '25px',
+      padding: '10px',
+      marginTop: '15px',
       textAlign: 'center' as const,
     },
     footer: {
       textAlign: 'center' as const,
-      marginTop: '40px',
-      paddingTop: '20px',
+      marginTop: '20px',
+      paddingTop: '10px',
       borderTop: '1px solid #ddd',
       color: '#666',
-      fontSize: '13px',
+      fontSize: '12px',
     },
     stampSection: {
-      marginTop: '24px',
+      marginTop: '15px',
       textAlign: 'center' as const,
-      breakInside: 'avoid' as const,
+      pageBreakInside: 'avoid' as const,
     },
     stampLabel: {
-      fontSize: '16px',
+      fontSize: '14px',
       fontWeight: 'bold' as const,
       color: '#333',
-      marginBottom: '10px',
+      marginBottom: '5px',
     },
     stampImage: {
       display: 'block',
-      maxWidth: '180px',
-      maxHeight: '180px',
+      maxWidth: '120px',
+      maxHeight: '120px',
       width: 'auto',
       height: 'auto',
       margin: '0 auto',
@@ -479,7 +480,15 @@ export default function PrintInvoicePage() {
         @media print {
           .no-print { display: none !important; }
           .print-only { display: block !important; }
-          @page { size: A4; margin: 10mm; }
+          @page { size: A4; margin: 5mm; }
+          body { 
+            -webkit-print-color-adjust: exact; 
+            print-color-adjust: exact; 
+          }
+          /* Ensure content scales to fit */
+          html, body {
+            height: max-content;
+          }
         }
       `}</style>
 
