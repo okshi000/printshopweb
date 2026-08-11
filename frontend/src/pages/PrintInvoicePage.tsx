@@ -238,25 +238,26 @@ const PrintableInvoice = ({ invoice, settings }: PrintableInvoiceProps) => {
       color: '#666',
       fontSize: '12px',
     },
-    stampSection: {
-      marginTop: '15px',
-      textAlign: 'center' as const,
-      pageBreakInside: 'avoid' as const,
+    footerArea: {
+      position: 'relative' as const,
     },
-    stampLabel: {
-      fontSize: '14px',
-      fontWeight: 'bold' as const,
-      color: '#333',
-      marginBottom: '5px',
+    stampSection: {
+      position: 'absolute' as const,
+      left: '10%',
+      top: '60%',
+      transform: 'translateY(-50%) rotate(-45deg)',
+      opacity: 0.8,
+      pointerEvents: 'none' as const,
+      zIndex: 10,
     },
     stampImage: {
       display: 'block',
-      maxWidth: '120px',
-      maxHeight: '120px',
+      maxWidth: '140px',
+      maxHeight: '140px',
       width: 'auto',
       height: 'auto',
-      margin: '0 auto',
       objectFit: 'contain' as const,
+      filter: 'drop-shadow(2px 4px 6px rgba(0,0,0,0.15))',
     },
   }
 
@@ -323,84 +324,86 @@ const PrintableInvoice = ({ invoice, settings }: PrintableInvoiceProps) => {
         </tbody>
       </table>
 
-      {/* Totals */}
-      <div style={styles.totalsSection}>
-        <table style={{ width: '100%', fontSize: '15px' }}>
-          <tbody>
-            <tr>
-              <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}>الإجمالي الفرعي:</td>
-              <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}>{formatCurrency(subtotal)}</td>
-            </tr>
-            {invoice.discount > 0 && (
-              <tr style={{ color: '#d32f2f' }}>
-                <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}>الخصم:</td>
-                <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}>- {formatCurrency(invoice.discount)}</td>
-              </tr>
-            )}
-            <tr>
-              <td style={{ ...styles.grandTotal, padding: '8px' }}>الإجمالي الكلي:</td>
-              <td style={{ ...styles.grandTotal, padding: '8px' }}>{formatCurrency(totalAmount)}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      {/* Payments */}
-      {payments.length > 0 && (
-        <>
-          <h3 style={styles.sectionTitle}>سجل الدفعات</h3>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.paymentsTableHeader}>التاريخ</th>
-                <th style={styles.paymentsTableHeader}>طريقة الدفع</th>
-                <th style={styles.paymentsTableHeader}>المبلغ</th>
-                <th style={styles.paymentsTableHeader}>ملاحظات</th>
-              </tr>
-            </thead>
+      {/* Footer Area Wrapper for Stamp Positioning */}
+      <div style={styles.footerArea}>
+        {/* Totals */}
+        <div style={styles.totalsSection}>
+          <table style={{ width: '100%', fontSize: '15px' }}>
             <tbody>
-              {payments.map((payment) => (
-                <tr key={payment.id}>
-                  <td style={styles.tableCell}>{formatDate(payment.payment_date || payment.created_at, 'dd/MM/yyyy', { locale: ar })}</td>
-                  <td style={styles.tableCell}>{getPaymentMethodName(payment.payment_method)}</td>
-                  <td style={styles.tableCell}>{formatCurrency(payment.amount)}</td>
-                  <td style={styles.tableCell}>{payment.notes || '-'}</td>
+              <tr>
+                <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}>الإجمالي الفرعي:</td>
+                <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}>{formatCurrency(subtotal)}</td>
+              </tr>
+              {invoice.discount > 0 && (
+                <tr style={{ color: '#d32f2f' }}>
+                  <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}>الخصم:</td>
+                  <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}>- {formatCurrency(invoice.discount)}</td>
                 </tr>
-              ))}
+              )}
+              <tr>
+                <td style={{ ...styles.grandTotal, padding: '8px' }}>الإجمالي الكلي:</td>
+                <td style={{ ...styles.grandTotal, padding: '8px' }}>{formatCurrency(totalAmount)}</td>
+              </tr>
             </tbody>
           </table>
-        </>
-      )}
-
-      {/* Payment Summary */}
-      <div style={styles.paymentSummary}>
-        <p style={{ margin: '5px 0', fontSize: '15px' }}><strong>المبلغ المدفوع:</strong> {formatCurrency(invoice.paid_amount)}</p>
-        <p style={{ margin: '5px 0', fontSize: '15px' }}><strong>المتبقي:</strong> {formatCurrency(invoice.remaining_amount)}</p>
-      </div>
-
-      {/* Notes */}
-      {invoice.notes && (
-        <div style={{ marginTop: '20px', padding: '15px', background: '#fff8e1', borderRadius: '8px' }}>
-          <strong>ملاحظات:</strong> {invoice.notes}
         </div>
-      )}
 
-      {/* Stamp */}
-      <div className="print-only" style={styles.stampSection}>
-        <div style={styles.stampLabel}>الختم</div>
-        {companyStamp ? (
-          <img
-            src={getImageUrl(companyStamp)}
-            alt="الختم"
-            style={styles.stampImage}
-          />
-        ) : (
-          <img
-            src={encodeURI('/ختم علبة.png')}
-            alt="الختم"
-            style={styles.stampImage}
-          />
+        {/* Payments */}
+        {payments.length > 0 && (
+          <>
+            <h3 style={styles.sectionTitle}>سجل الدفعات</h3>
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.paymentsTableHeader}>التاريخ</th>
+                  <th style={styles.paymentsTableHeader}>طريقة الدفع</th>
+                  <th style={styles.paymentsTableHeader}>المبلغ</th>
+                  <th style={styles.paymentsTableHeader}>ملاحظات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payments.map((payment) => (
+                  <tr key={payment.id}>
+                    <td style={styles.tableCell}>{formatDate(payment.payment_date || payment.created_at, 'dd/MM/yyyy', { locale: ar })}</td>
+                    <td style={styles.tableCell}>{getPaymentMethodName(payment.payment_method)}</td>
+                    <td style={styles.tableCell}>{formatCurrency(payment.amount)}</td>
+                    <td style={styles.tableCell}>{payment.notes || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
         )}
+
+        {/* Payment Summary */}
+        <div style={styles.paymentSummary}>
+          <p style={{ margin: '5px 0', fontSize: '15px' }}><strong>المبلغ المدفوع:</strong> {formatCurrency(invoice.paid_amount)}</p>
+          <p style={{ margin: '5px 0', fontSize: '15px' }}><strong>المتبقي:</strong> {formatCurrency(invoice.remaining_amount)}</p>
+        </div>
+
+        {/* Notes */}
+        {invoice.notes && (
+          <div style={{ marginTop: '20px', padding: '15px', background: '#fff8e1', borderRadius: '8px' }}>
+            <strong>ملاحظات:</strong> {invoice.notes}
+          </div>
+        )}
+
+        {/* Stamp */}
+        <div className="print-only" style={styles.stampSection}>
+          {companyStamp ? (
+            <img
+              src={getImageUrl(companyStamp)}
+              alt="الختم"
+              style={styles.stampImage}
+            />
+          ) : (
+            <img
+              src={encodeURI('/ختم علبة.png')}
+              alt="الختم"
+              style={styles.stampImage}
+            />
+          )}
+        </div>
       </div>
 
       {/* Footer */}
