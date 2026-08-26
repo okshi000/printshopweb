@@ -187,9 +187,13 @@ class AiReportController extends Controller
         // محاولة كل نموذج
         foreach ($this->models as $model) {
             try {
-                $url = "{$this->geminiBaseUrl}/{$model}:generateContent?key={$apiKey}";
+                $url = "{$this->geminiBaseUrl}/{$model}:generateContent";
 
-                $response = Http::timeout(60)->post($url, [
+                $response = Http::timeout(60)
+                    ->withHeaders([
+                        'x-goog-api-key' => $apiKey
+                    ])
+                    ->post($url, [
                     'contents' => [
                         [
                             'parts' => [

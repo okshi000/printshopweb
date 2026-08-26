@@ -635,6 +635,7 @@ DB_USERNAME=printshop
 DB_PASSWORD=strong_password
 SANCTUM_STATEFUL_DOMAINS=102.203.200.213
 SESSION_DOMAIN=102.203.200.213
+GEMINI_API_KEY=<your_api_key_here>
 ```
 
 ### Nginx Configuration:
