@@ -29,7 +29,8 @@ class ArchiveAllInvoices extends Command
         $this->info('إعادة حساب أرصدة الموردين...');
         $this->call('suppliers:recalculate-balances');
 
-        ActivityLog::log('update', 'invoices', "أرشفة جماعية لكافة الفواتير الحالية ({$updated} فاتورة)");
+        $adminId = \App\Models\User::first()?->id ?? 1;
+        ActivityLog::log('update', 'invoices', "أرشفة جماعية لكافة الفواتير الحالية ({$updated} فاتورة)", null, null, null, $adminId);
 
         $this->newLine();
         $this->info('اكتملت العملية بنجاح. أصبحت جميع الفواتير الآن في قسم الأرشيف وخارج كافة الحسابات المالية.');
