@@ -100,6 +100,8 @@ export const invoicesApi = {
   delete: (id: number) => api.delete(`/invoices/${id}`),
   updateStatus: (id: number, status: string) => api.patch(`/invoices/${id}/status`, { status }),
   addPayment: (id: number, data: Record<string, unknown>) => api.post(`/invoices/${id}/payments`, data),
+  archive: (id: number) => api.post(`/invoices/${id}/archive`),
+  unarchive: (id: number) => api.post(`/invoices/${id}/unarchive`),
   statistics: (params?: Record<string, unknown>) => api.get('/invoices-statistics', { params }),
 };
 

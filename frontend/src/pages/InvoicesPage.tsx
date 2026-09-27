@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -19,6 +19,9 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Archive,
+  ArchiveRestore,
+  Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
@@ -54,6 +57,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Pagination } from '@/components/ui/pagination';
 import { invoicesApi } from '../api';
 import type { Invoice, PaginatedResponse } from '../types';
@@ -62,8 +73,13 @@ import { cn, formatCurrency, formatDate, getStatusColor, getStatusLabel, getPaym
 
 export default function InvoicesPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { hasPermission } = useAuth();
   const [page, setPage] = useState(1);
+  const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
+  const [invoiceToArchive, setInvoiceToArchive] = useState<Invoice | null>(null);
+  const [invoiceToUnarchive, setInvoiceToUnarchive] = useState<Invoice | null>(null);
+  const [isActionPending, setIsActionPending] = useState(false);
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState<string>('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -72,6 +88,15 @@ export default function InvoicesPage() {
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [isExporting, setIsExporting] = useState(false);
   const [sortByDeliveryDate, setSortByDeliveryDate] = useState<'asc' | 'desc' | ''>('');
+
+  // Statistics for live tab counts
+  const { data: statsData } = useQuery({
+    queryKey: ['invoices-statistics-tab-counts'],
+    queryFn: async () => {
+      const res = await invoicesApi.statistics();
+      return res.data;
+    },
+  });
 
   // Debounce search
   const handleSearchChange = (value: string) => {
@@ -84,9 +109,12 @@ export default function InvoicesPage() {
   };
 
   const { data, isLoading, error } = useQuery<PaginatedResponse<Invoice>>({
-    queryKey: ['invoices', page, invoiceStatusFilter, debouncedSearch, dateFrom, dateTo, sortByDeliveryDate],
+    queryKey: ['invoices', page, invoiceStatusFilter, debouncedSearch, dateFrom, dateTo, sortByDeliveryDate, activeTab],
     queryFn: async () => {
       const params: Record<string, string | number> = { page, per_page: 10 };
+      if (activeTab === 'archived') {
+        params.archived = 'true';
+      }
       if (invoiceStatusFilter) params.status = invoiceStatusFilter;
       if (debouncedSearch) params.search = debouncedSearch;
       if (dateFrom) params.date_from = dateFrom.toISOString().split('T')[0];
@@ -127,6 +155,40 @@ export default function InvoicesPage() {
     setPage(1);
   };
 
+  const handleConfirmArchive = async () => {
+    if (!invoiceToArchive) return;
+    try {
+      setIsActionPending(true);
+      await invoicesApi.archive(invoiceToArchive.id);
+      toast.success(`تمت أرشفة الفاتورة ${invoiceToArchive.invoice_number} بنجاح واستبعادها من الحسابات المالية`);
+      setInvoiceToArchive(null);
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices-statistics-tab-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'فشل أرشفة الفاتورة');
+    } finally {
+      setIsActionPending(false);
+    }
+  };
+
+  const handleConfirmUnarchive = async () => {
+    if (!invoiceToUnarchive) return;
+    try {
+      setIsActionPending(true);
+      await invoicesApi.unarchive(invoiceToUnarchive.id);
+      toast.success(`تم إلغاء أرشفة الفاتورة ${invoiceToUnarchive.invoice_number} واستعادتها للحسابات المالية بنجاح`);
+      setInvoiceToUnarchive(null);
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices-statistics-tab-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'فشل استعادة الفاتورة');
+    } finally {
+      setIsActionPending(false);
+    }
+  };
+
   const hasActiveFilters = invoiceStatusFilter || paymentStatusFilter || dateFrom || dateTo || searchTerm || sortByDeliveryDate;
 
   const exportHeaders = [
@@ -159,6 +221,7 @@ export default function InvoicesPage() {
 
   const buildExportParams = (targetPage: number) => {
     const params: Record<string, string | number> = { page: targetPage, per_page: 200 };
+    if (activeTab === 'archived') params.archived = 'true';
     if (invoiceStatusFilter) params.status = invoiceStatusFilter;
     if (debouncedSearch) params.search = debouncedSearch;
     if (dateFrom) params.date_from = dateFrom.toISOString().split('T')[0];
@@ -351,6 +414,71 @@ export default function InvoicesPage() {
         </div>
       </div>
 
+      {/* Tabs for Active vs Archived Invoices */}
+      <div className="flex border-b border-border/60 gap-4">
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('active');
+            setPage(1);
+          }}
+          className={cn(
+            "flex items-center gap-2 pb-3 px-3 font-medium text-sm transition-all border-b-2 -mb-px",
+            activeTab === 'active'
+              ? "border-primary text-primary font-semibold"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Receipt className="h-4 w-4" />
+          <span>الفواتير النشطة</span>
+          {statsData?.active_invoices_count !== undefined && (
+            <Badge variant="secondary" className="mr-1 text-xs">
+              {statsData.active_invoices_count}
+            </Badge>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('archived');
+            setPage(1);
+          }}
+          className={cn(
+            "flex items-center gap-2 pb-3 px-3 font-medium text-sm transition-all border-b-2 -mb-px",
+            activeTab === 'archived'
+              ? "border-amber-500 text-amber-600 dark:text-amber-400 font-semibold"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Archive className="h-4 w-4" />
+          <span>الفواتير المؤرشفة (الأرشيف)</span>
+          {statsData?.archived_invoices_count !== undefined && (
+            <Badge 
+              variant="outline" 
+              className={cn(
+                "mr-1 text-xs",
+                activeTab === 'archived'
+                  ? "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300"
+                  : "bg-muted text-muted-foreground"
+              )}
+            >
+              {statsData.archived_invoices_count}
+            </Badge>
+          )}
+        </button>
+      </div>
+
+      {activeTab === 'archived' && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-800 dark:text-amber-300 flex items-start gap-3">
+          <Info className="h-5 w-5 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="text-sm">
+            <span className="font-semibold block mb-0.5">قسم الفواتير المؤرشفة:</span>
+            جميع الفواتير في هذا القسم مستبعدة كلياً من الحسابات المالية وتقارير الأرباح والمبيعات ومستحقات الديون. الفواتير هنا محفوظة كبيانات مرجعية وسجلات تاريخية فقط.
+          </div>
+        </div>
+      )}
+
       {/* Filters */}
       <Card className="shadow-soft">
         <CardContent className="p-4">
@@ -463,9 +591,16 @@ export default function InvoicesPage() {
       {/* Main Content */}
       <Card className="shadow-soft">
         <CardHeader className="border-b border-border/50 pb-4">
-          <CardTitle className="text-lg">قائمة الفواتير</CardTitle>
+          <CardTitle className="text-lg flex items-center justify-between">
+            <span>{activeTab === 'archived' ? 'فواتير الأرشيف (مرجع بيانات)' : 'قائمة الفواتير النشطة'}</span>
+            {activeTab === 'archived' && (
+              <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-300">
+                مستبعدة من الحسابات المالية
+              </Badge>
+            )}
+          </CardTitle>
           <CardDescription>
-            {data?.total || 0} فاتورة
+            {data?.total || 0} {activeTab === 'archived' ? 'فاتورة مؤرشفة' : 'فاتورة نشطة'}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -519,10 +654,22 @@ export default function InvoicesPage() {
                         >
                           <TableCell>
                             <div className="flex items-center gap-3">
-                              <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-500/10 flex items-center justify-center">
-                                <FileText className="h-5 w-5 text-blue-500" />
+                              <div className={cn(
+                                "h-10 w-10 rounded-lg flex items-center justify-center",
+                                invoice.is_archived
+                                  ? "bg-amber-500/15 text-amber-600"
+                                  : "bg-gradient-to-br from-blue-500/20 to-blue-500/10 text-blue-500"
+                              )}>
+                                {invoice.is_archived ? <Archive className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
                               </div>
-                              <span className="font-mono font-medium">{invoice.invoice_number}</span>
+                              <div className="flex flex-col">
+                                <span className="font-mono font-medium">{invoice.invoice_number}</span>
+                                {invoice.is_archived && (
+                                  <Badge variant="outline" className="w-fit text-[10px] py-0 px-1.5 mt-0.5 bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/50 dark:text-amber-400">
+                                    مؤرشفة
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -578,25 +725,28 @@ export default function InvoicesPage() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
+                                title="عرض التفاصيل"
                                 onClick={() => navigate(`/invoices/${invoice.id}`)}
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              {hasPermission('edit invoices') && invoice.status === 'draft' && (
+                              {!invoice.is_archived && hasPermission('edit invoices') && invoice.status === 'draft' && (
                                 <Button
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 text-amber-600 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950"
+                                  title="تعديل"
                                   onClick={() => navigate(`/invoices/${invoice.id}/edit`)}
                                 >
                                   <Pencil className="h-4 w-4" />
                                 </Button>
                               )}
-                              {hasPermission('create invoice_payments') && remaining > 0 && invoice.status !== 'cancelled' && (
+                              {!invoice.is_archived && hasPermission('create invoice_payments') && remaining > 0 && invoice.status !== 'cancelled' && (
                                 <Button
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 text-green-600 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950"
+                                  title="تسجيل دفعة"
                                   onClick={() => navigate(`/invoices/${invoice.id}`)}
                                 >
                                   <Banknote className="h-4 w-4" />
@@ -606,10 +756,35 @@ export default function InvoicesPage() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
+                                title="طباعة"
                                 onClick={() => window.open(`/invoices/${invoice.id}/print`, '_blank')}
                               >
                                 <Printer className="h-4 w-4" />
                               </Button>
+
+                              {hasPermission('edit invoices') && (
+                                invoice.is_archived ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950"
+                                    title="إلغاء الأرشفة واستعادة للحسابات المالية"
+                                    onClick={() => setInvoiceToUnarchive(invoice)}
+                                  >
+                                    <ArchiveRestore className="h-4 w-4" />
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950"
+                                    title="أرشفة الفاتورة واستبعادها من المالية"
+                                    onClick={() => setInvoiceToArchive(invoice)}
+                                  >
+                                    <Archive className="h-4 w-4" />
+                                  </Button>
+                                )
+                              )}
                             </div>
                           </TableCell>
                         </motion.tr>
@@ -656,6 +831,74 @@ export default function InvoicesPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Archive Confirmation Dialog */}
+      <Dialog open={!!invoiceToArchive} onOpenChange={(open) => !open && setInvoiceToArchive(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <Archive className="h-5 w-5" />
+              تأكيد أرشفة الفاتورة
+            </DialogTitle>
+            <DialogDescription className="space-y-3 pt-2 text-foreground/80">
+              <p>
+                هل أنت متأكد من أرشفة الفاتورة رقم{' '}
+                <span className="font-bold text-foreground">{invoiceToArchive?.invoice_number}</span>؟
+              </p>
+              <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3 text-xs text-amber-800 dark:text-amber-300">
+                ⚠️ بمجرد الأرشفة، ستخرج هذه الفاتورة من كافة الحسابات المالية وتقارير الإيرادات والأرباح ومستحقات الديون، وستبقى فقط كمرجع بيانات.
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setInvoiceToArchive(null)}>
+              إلغاء
+            </Button>
+            <Button
+              className="bg-amber-600 hover:bg-amber-700 text-white gap-2"
+              onClick={handleConfirmArchive}
+              disabled={isActionPending}
+            >
+              <Archive className="h-4 w-4" />
+              {isActionPending ? 'جاري الأرشفة...' : 'تأكيد الأرشفة'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unarchive Confirmation Dialog */}
+      <Dialog open={!!invoiceToUnarchive} onOpenChange={(open) => !open && setInvoiceToUnarchive(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-primary">
+              <ArchiveRestore className="h-5 w-5" />
+              تأكيد إلغاء الأرشفة
+            </DialogTitle>
+            <DialogDescription className="space-y-3 pt-2 text-foreground/80">
+              <p>
+                هل تريد إلغاء أرشفة الفاتورة رقم{' '}
+                <span className="font-bold text-foreground">{invoiceToUnarchive?.invoice_number}</span> وإعادتها لقائمة الفواتير النشطة؟
+              </p>
+              <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 p-3 text-xs text-blue-800 dark:text-blue-300">
+                ℹ️ ستعود الفاتورة مجدداً للدخول في الحسابات المالية ومطالبات الديون والتقارير.
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setInvoiceToUnarchive(null)}>
+              إلغاء
+            </Button>
+            <Button
+              onClick={handleConfirmUnarchive}
+              disabled={isActionPending}
+              className="gap-2"
+            >
+              <ArchiveRestore className="h-4 w-4" />
+              {isActionPending ? 'جاري الاستعادة...' : 'استعادة الفاتورة'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }

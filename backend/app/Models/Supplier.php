@@ -45,8 +45,13 @@ class Supplier extends Model
 
     public function recalculateBalance(): void
     {
-        // حساب التكاليف غير المدفوعة فقط
-        $totalCosts = $this->costs()->where('is_paid', false)->sum('amount');
+        // حساب التكاليف غير المدفوعة فقط للفواتير غير المؤرشفة
+        $totalCosts = $this->costs()
+            ->where('is_paid', false)
+            ->whereHas('invoiceItem.invoice', function ($q) {
+                $q->where('is_archived', false);
+            })
+            ->sum('amount');
         $totalPayments = $this->payments()->sum('amount');
         $this->total_debt = $totalCosts - $totalPayments;
         $this->save();
@@ -60,7 +65,12 @@ class Supplier extends Model
 
     public function getTotalPurchasesAttribute(): float
     {
-        return (float) $this->costs()->where('is_paid', false)->sum('amount');
+        return (float) $this->costs()
+            ->where('is_paid', false)
+            ->whereHas('invoiceItem.invoice', function ($q) {
+                $q->where('is_archived', false);
+            })
+            ->sum('amount');
     }
 
     public function getTotalPaidAttribute(): float

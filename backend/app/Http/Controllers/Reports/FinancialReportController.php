@@ -194,6 +194,7 @@ class FinancialReportController extends Controller
 
         // تكلفة البضاعة المباعة
         $costOfGoodsSold = InvoiceItem::join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
+            ->where('invoices.is_archived', false)
             ->whereBetween('invoices.invoice_date', [$startDate, $endDate])
             ->sum('invoice_items.total_cost');
 
@@ -260,6 +261,7 @@ class FinancialReportController extends Controller
 
         // تكلفة المبيعات
         $costOfSales = InvoiceItem::join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
+            ->where('invoices.is_archived', false)
             ->whereBetween('invoices.invoice_date', [$startDate, $endDate])
             ->sum('invoice_items.total_cost');
 

@@ -95,7 +95,7 @@ class EnsureApiPermission
                 return 'invoices.payment';
             }
 
-            if (in_array('status', $segments, true)) {
+            if (in_array('status', $segments, true) || in_array('archive', $segments, true) || in_array('unarchive', $segments, true)) {
                 return 'invoices.edit';
             }
 

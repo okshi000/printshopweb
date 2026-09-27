@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -14,6 +15,8 @@ class Invoice extends Model
         'invoice_date',
         'delivery_date',
         'status',
+        'is_archived',
+        'archived_at',
         'subtotal',
         'discount',
         'total',
@@ -27,6 +30,8 @@ class Invoice extends Model
     protected $casts = [
         'invoice_date' => 'date',
         'delivery_date' => 'date',
+        'is_archived' => 'boolean',
+        'archived_at' => 'datetime',
         'subtotal' => 'decimal:2',
         'discount' => 'decimal:2',
         'total' => 'decimal:2',
@@ -41,6 +46,28 @@ class Invoice extends Model
         'customer_phone',
         'total_amount',
     ];
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope('notArchived', function (Builder $builder) {
+            $builder->where('invoices.is_archived', false);
+        });
+    }
+
+    public function resolveRouteBindingQuery($query, $value, $field = null)
+    {
+        return parent::resolveRouteBindingQuery($query, $value, $field)->withoutGlobalScope('notArchived');
+    }
+
+    public function scopeArchived(Builder $query): Builder
+    {
+        return $query->withoutGlobalScope('notArchived')->where('invoices.is_archived', true);
+    }
+
+    public function scopeWithArchived(Builder $query): Builder
+    {
+        return $query->withoutGlobalScope('notArchived');
+    }
 
     public function customer(): BelongsTo
     {

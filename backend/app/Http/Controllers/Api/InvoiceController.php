@@ -19,7 +19,13 @@ class InvoiceController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = Invoice::with('customer');
+        $isArchived = $request->boolean('archived') || $request->input('archived') === 'true' || $request->input('tab') === 'archived';
+
+        if ($isArchived) {
+            $query = Invoice::withoutGlobalScope('notArchived')->where('invoices.is_archived', true)->with('customer');
+        } else {
+            $query = Invoice::with('customer');
+        }
 
         if ($request->has('search')) {
             $search = $request->search;
@@ -182,6 +188,10 @@ class InvoiceController extends Controller
 
     public function update(Request $request, Invoice $invoice): JsonResponse
     {
+        if ($invoice->is_archived) {
+            return response()->json(['message' => 'لا يمكن تعديل فاتورة مؤرشفة. يرجى إلغاء الأرشفة أولاً.'], 422);
+        }
+
         $validated = $request->validate([
             'customer_id' => 'nullable|exists:customers,id',
             'invoice_date' => 'nullable|date',
@@ -287,6 +297,10 @@ class InvoiceController extends Controller
 
     public function updateStatus(Request $request, Invoice $invoice): JsonResponse
     {
+        if ($invoice->is_archived) {
+            return response()->json(['message' => 'لا يمكن تغيير حالة فاتورة مؤرشفة.'], 422);
+        }
+
         $validated = $request->validate([
             'status' => 'required|in:new,in_progress,ready,delivered,cancelled',
         ]);
@@ -306,6 +320,10 @@ class InvoiceController extends Controller
 
     public function addPayment(Request $request, Invoice $invoice): JsonResponse
     {
+        if ($invoice->is_archived) {
+            return response()->json(['message' => 'لا يمكن تسجيل دفعة على فاتورة مؤرشفة.'], 422);
+        }
+
         $remainingAmount = $invoice->total - $invoice->payments()->sum('amount');
         
         $validated = $request->validate([
@@ -356,11 +374,16 @@ class InvoiceController extends Controller
             $q->where('invoice_date', '>=', $fromDate);
         })->sum('amount');
 
+        $activeInvoicesCount = Invoice::count();
+        $archivedInvoicesCount = Invoice::withoutGlobalScope('notArchived')->where('invoices.is_archived', true)->count();
+
         $responseData = [
             'period_days' => $days,
             'from_date' => $fromDate,
             'to_date' => now()->toDateString(),
             'total_invoices' => $totalInvoices,
+            'active_invoices_count' => $activeInvoicesCount,
+            'archived_invoices_count' => $archivedInvoicesCount,
             'total_sales' => round($totalSales, 2),
             'total_paid' => round($totalPaid, 2),
             'average_invoice' => $totalInvoices > 0 ? round($totalSales / $totalInvoices, 2) : 0,
@@ -425,5 +448,81 @@ class InvoiceController extends Controller
         ActivityLog::log('delete', 'invoices', "حذف الفاتورة: {$invoiceNumber}");
 
         return response()->json(['message' => 'تم حذف الفاتورة بنجاح']);
+    }
+
+    public function archive(Invoice $invoice): JsonResponse
+    {
+        if ($invoice->is_archived) {
+            return response()->json(['message' => 'الفاتورة مؤرشفة بالفعل.'], 400);
+        }
+
+        DB::transaction(function () use ($invoice) {
+            $invoice->update([
+                'is_archived' => true,
+                'archived_at' => now(),
+            ]);
+
+            // Recalculate supplier balances for suppliers involved
+            $supplierIds = $invoice->items()
+                ->with('costs')
+                ->get()
+                ->flatMap(fn($item) => $item->costs->pluck('supplier_id'))
+                ->unique()
+                ->filter();
+
+            foreach ($supplierIds as $supplierId) {
+                Supplier::find($supplierId)?->recalculateBalance();
+            }
+        });
+
+        ActivityLog::log(
+            'update',
+            'invoices',
+            "أرشفة الفاتورة: {$invoice->invoice_number}",
+            $invoice->id
+        );
+
+        return response()->json([
+            'message' => 'تمت أرشفة الفاتورة بنجاح واستبعادها من كافة الحسابات المالية.',
+            'invoice' => $invoice->fresh(['customer', 'items.costs', 'payments'])
+        ]);
+    }
+
+    public function unarchive(Invoice $invoice): JsonResponse
+    {
+        if (!$invoice->is_archived) {
+            return response()->json(['message' => 'الفاتورة غير مؤرشفة.'], 400);
+        }
+
+        DB::transaction(function () use ($invoice) {
+            $invoice->update([
+                'is_archived' => false,
+                'archived_at' => null,
+            ]);
+
+            // Recalculate supplier balances for suppliers involved
+            $supplierIds = $invoice->items()
+                ->with('costs')
+                ->get()
+                ->flatMap(fn($item) => $item->costs->pluck('supplier_id'))
+                ->unique()
+                ->filter();
+
+            foreach ($supplierIds as $supplierId) {
+                Supplier::find($supplierId)?->recalculateBalance();
+            }
+        });
+
+        ActivityLog::log(
+            'update',
+            'invoices',
+            "إلغاء أرشفة الفاتورة: {$invoice->invoice_number}",
+            $invoice->id
+        );
+
+        return response()->json([
+            'message' => 'تم إلغاء أرشفة الفاتورة واستعادتها للحسابات المالية بنجاح.',
+            'invoice' => $invoice->fresh(['customer', 'items.costs', 'payments'])
+        ]);
     }
 }

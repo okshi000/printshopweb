@@ -32,6 +32,7 @@ class AccountantController extends Controller
 
         $customer_debts = DB::table('invoices')
             ->where('status', '!=', 'cancelled')
+            ->where('is_archived', false)
             ->sum('remaining_amount');
 
         $other_debts = DB::table('debts')
@@ -53,17 +54,20 @@ class AccountantController extends Controller
         // 4. الإيرادات للفترة المحددة
         $total_revenue = DB::table('invoices')
             ->where('status', '!=', 'cancelled')
+            ->where('is_archived', false)
             ->whereBetween('invoice_date', [$startDate, $endDate])
             ->sum('total');
 
         $prev_revenue = DB::table('invoices')
             ->where('status', '!=', 'cancelled')
+            ->where('is_archived', false)
             ->whereBetween('invoice_date', [$prevStartDate, $prevEndDate])
             ->sum('total');
 
         // 5. تكلفة البضاعة المباعة
         $total_cogs = DB::table('invoices')
             ->where('status', '!=', 'cancelled')
+            ->where('is_archived', false)
             ->whereBetween('invoice_date', [$startDate, $endDate])
             ->sum('total_cost');
 
@@ -82,6 +86,7 @@ class AccountantController extends Controller
 
         $prev_cogs = DB::table('invoices')
             ->where('status', '!=', 'cancelled')
+            ->where('is_archived', false)
             ->whereBetween('invoice_date', [$prevStartDate, $prevEndDate])
             ->sum('total_cost');
         $prev_net_profit = ($prev_revenue - $prev_cogs) - $prev_expenses;
@@ -94,6 +99,7 @@ class AccountantController extends Controller
         // 8. عدد الفواتير غير المدفوعة
         $unpaid_invoices = DB::table('invoices')
             ->where('status', '!=', 'cancelled')
+            ->where('is_archived', false)
             ->where('remaining_amount', '>', 0)
             ->count();
 
@@ -117,6 +123,7 @@ class AccountantController extends Controller
         // عدد الفواتير المدفوعة
         $paid_invoices = DB::table('invoices')
             ->where('status', '!=', 'cancelled')
+            ->where('is_archived', false)
             ->where('remaining_amount', '=', 0)
             ->count();
 
@@ -133,6 +140,7 @@ class AccountantController extends Controller
         // عدد العملاء الذين لديهم ديون
         $customers_with_receivables = DB::table('invoices')
             ->where('status', '!=', 'cancelled')
+            ->where('is_archived', false)
             ->where('remaining_amount', '>', 0)
             ->distinct('customer_id')
             ->count();
@@ -219,6 +227,7 @@ class AccountantController extends Controller
         // 1. الإيرادات
         $salesData = DB::table('invoices')
             ->where('status', '!=', 'cancelled')
+            ->where('is_archived', false)
             ->whereBetween('invoice_date', [$startDate, $endDate])
             ->selectRaw('COUNT(*) as count, SUM(subtotal) as subtotal, SUM(discount) as discount, SUM(total) as total')
             ->first();
@@ -230,6 +239,7 @@ class AccountantController extends Controller
             ->join('invoice_items', 'item_costs.invoice_item_id', '=', 'invoice_items.id')
             ->join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
             ->where('invoices.status', '!=', 'cancelled')
+            ->where('invoices.is_archived', false)
             ->whereBetween('invoices.invoice_date', [$startDate, $endDate])
             ->groupBy('item_costs.cost_type')
             ->selectRaw('item_costs.cost_type, SUM(item_costs.amount) as amount')
@@ -298,6 +308,7 @@ class AccountantController extends Controller
 
         $accounts_receivable = DB::table('invoices')
             ->where('status', '!=', 'cancelled')
+            ->where('is_archived', false)
             ->sum('remaining_amount');
 
         $other_receivables = DB::table('debts')
@@ -364,6 +375,7 @@ class AccountantController extends Controller
         // جلب الإيرادات حسب التاريخ
         $revenues = DB::table('invoices')
             ->where('status', '!=', 'cancelled')
+            ->where('is_archived', false)
             ->whereBetween('invoice_date', [$startDate, $endDate])
             ->groupBy('date')
             ->selectRaw('DATE(invoice_date) as date, SUM(total) as revenue')
@@ -452,6 +464,7 @@ class AccountantController extends Controller
             ->selectRaw('customer_id, customers.name, COUNT(*) as invoice_count, SUM(total) as total_amount, SUM(remaining_amount) as outstanding')
             ->leftJoin('customers', 'invoices.customer_id', '=', 'customers.id')
             ->where('invoices.status', '!=', 'cancelled')
+            ->where('invoices.is_archived', false)
             ->whereBetween('invoices.invoice_date', [$startDate, $endDate])
             ->groupBy('customer_id', 'customers.name')
             ->orderByDesc('total_amount')
@@ -464,6 +477,7 @@ class AccountantController extends Controller
             ->leftJoin('products', 'invoice_items.product_id', '=', 'products.id')
             ->join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
             ->where('invoices.status', '!=', 'cancelled')
+            ->where('invoices.is_archived', false)
             ->whereBetween('invoices.invoice_date', [$startDate, $endDate])
             ->groupBy('product_id', 'products.name')
             ->orderByDesc('revenue')
@@ -483,6 +497,7 @@ class AccountantController extends Controller
         $weeklyTrend = DB::table('invoices')
             ->selectRaw('YEARWEEK(invoice_date) as week, SUM(total) as revenue, COUNT(*) as invoice_count')
             ->where('status', '!=', 'cancelled')
+            ->where('is_archived', false)
             ->whereBetween('invoice_date', [$startDate, $endDate])
             ->groupBy('week')
             ->orderBy('week')
@@ -519,12 +534,14 @@ class AccountantController extends Controller
         // المؤشرات
         $currentRevenue = DB::table('invoices')
             ->where('status', '!=', 'cancelled')
+            ->where('is_archived', false)
             ->whereMonth('invoice_date', $currentMonth)
             ->whereYear('invoice_date', $currentYear)
             ->sum('total');
 
         $prevRevenue = DB::table('invoices')
             ->where('status', '!=', 'cancelled')
+            ->where('is_archived', false)
             ->whereMonth('invoice_date', $prevMonth)
             ->whereYear('invoice_date', $prevYear)
             ->sum('total');
@@ -545,8 +562,8 @@ class AccountantController extends Controller
         $recommendations = [];
 
         // 1. النقدية
-        $current_ratio = DB::table('invoices')->where('status', '!=', 'cancelled')->sum('remaining_amount') > 0 
-            ? $total_cash / DB::table('invoices')->where('status', '!=', 'cancelled')->sum('remaining_amount')
+        $current_ratio = DB::table('invoices')->where('status', '!=', 'cancelled')->where('is_archived', false)->sum('remaining_amount') > 0 
+            ? $total_cash / DB::table('invoices')->where('status', '!=', 'cancelled')->where('is_archived', false)->sum('remaining_amount')
             : 0;
 
         if ($current_ratio > 2) {
@@ -583,6 +600,7 @@ class AccountantController extends Controller
         // 4. الديون المستحقة
         $uncollected_amount = DB::table('invoices')
             ->where('status', '!=', 'cancelled')
+            ->where('is_archived', false)
             ->where('remaining_amount', '>', 0)
             ->sum('remaining_amount');
 

@@ -53,6 +53,8 @@ Route::middleware(['auth:sanctum', 'api.permission'])->group(function () {
     Route::apiResource('invoices', InvoiceController::class);
     Route::patch('/invoices/{invoice}/status', [InvoiceController::class, 'updateStatus']);
     Route::post('/invoices/{invoice}/payments', [InvoiceController::class, 'addPayment']);
+    Route::post('/invoices/{invoice}/archive', [InvoiceController::class, 'archive']);
+    Route::post('/invoices/{invoice}/unarchive', [InvoiceController::class, 'unarchive']);
     Route::get('/invoices-statistics', [InvoiceController::class, 'statistics']);
 
     // Expenses

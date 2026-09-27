@@ -9,7 +9,8 @@ import { format } from 'date-fns'
 import { ar } from 'date-fns/locale'
 import {
   ArrowLeft, Printer, Edit, CreditCard, User, Calendar, Clock, 
-  CheckCircle2, AlertCircle, Loader2, Package, Coins, Receipt, Trash2
+  CheckCircle2, AlertCircle, Loader2, Package, Coins, Receipt, Trash2,
+  Archive, ArchiveRestore, Info
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -19,7 +20,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -72,6 +73,8 @@ interface Invoice {
   customer_name: string
   customer_phone?: string
   status: string
+  is_archived?: boolean
+  archived_at?: string | null
   total_amount: number
   paid_amount: number
   remaining_amount: number
@@ -103,6 +106,7 @@ export default function ViewInvoicePage() {
   const [paymentType, setPaymentType] = useState('partial')
   const [paymentNotes, setPaymentNotes] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [archiveConfirm, setArchiveConfirm] = useState(false)
 
   const { data: invoice, isLoading, error } = useQuery<Invoice>({
     queryKey: ['invoice', id],
@@ -154,6 +158,29 @@ export default function ViewInvoicePage() {
     },
   })
 
+  const archiveMutation = useMutation({
+    mutationFn: async () => invoicesApi.archive(Number(id)),
+    onSuccess: () => {
+      toast.success('تمت أرشفة الفاتورة بنجاح واستبعادها من الحسابات المالية')
+      queryClient.invalidateQueries({ queryKey: ['invoice', id] })
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      setArchiveConfirm(false)
+    },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'فشل أرشفة الفاتورة'),
+  })
+
+  const unarchiveMutation = useMutation({
+    mutationFn: async () => invoicesApi.unarchive(Number(id)),
+    onSuccess: () => {
+      toast.success('تم إلغاء أرشفة الفاتورة واستعادتها للحسابات المالية بنجاح')
+      queryClient.invalidateQueries({ queryKey: ['invoice', id] })
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'فشل استعادة الفاتورة'),
+  })
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -200,20 +227,53 @@ export default function ViewInvoicePage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {invoice.is_archived && (
+            <Badge variant="outline" className="gap-1 bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-300">
+              <Archive className="h-3.5 w-3.5" />
+              مؤرشفة
+            </Badge>
+          )}
           <Badge className={cn('gap-1', status.color)}>{status.icon}{status.label}</Badge>
           <Link to={`/invoices/${id}/print`}>
             <Button variant="outline" size="sm" className="gap-1">
               <Printer className="h-4 w-4" /> طباعة
             </Button>
           </Link>
-          <Link to={`/invoices/${id}/edit`}>
-            <Button variant="outline" size="sm" className="gap-1">
-              <Edit className="h-4 w-4" /> تعديل
+          {!invoice.is_archived && (
+            <Link to={`/invoices/${id}/edit`}>
+              <Button variant="outline" size="sm" className="gap-1">
+                <Edit className="h-4 w-4" /> تعديل
+              </Button>
+            </Link>
+          )}
+          {!invoice.is_archived && (
+            <Button size="sm" className="gap-1" onClick={() => setPaymentOpen(true)} disabled={invoice.remaining_amount <= 0}>
+              <CreditCard className="h-4 w-4" /> تسجيل دفعة
             </Button>
-          </Link>
-          <Button size="sm" className="gap-1" onClick={() => setPaymentOpen(true)} disabled={invoice.remaining_amount <= 0}>
-            <CreditCard className="h-4 w-4" /> تسجيل دفعة
-          </Button>
+          )}
+          {hasPermission('edit invoices') && (
+            invoice.is_archived ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1 text-amber-600 border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950"
+                onClick={() => unarchiveMutation.mutate()}
+                disabled={unarchiveMutation.isPending}
+              >
+                <ArchiveRestore className="h-4 w-4" />
+                {unarchiveMutation.isPending ? 'جاري الاستعادة...' : 'إلغاء الأرشفة'}
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1 text-slate-600 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950"
+                onClick={() => setArchiveConfirm(true)}
+              >
+                <Archive className="h-4 w-4" /> أرشفة
+              </Button>
+            )
+          )}
           <Button 
             variant="destructive" 
             size="sm" 
@@ -225,6 +285,16 @@ export default function ViewInvoicePage() {
           </Button>
         </div>
       </motion.div>
+
+      {invoice.is_archived && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-800 dark:text-amber-300 flex items-start gap-3">
+          <Info className="h-5 w-5 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="text-sm">
+            <span className="font-semibold block mb-0.5">تنبيه: هذه الفاتورة مؤرشفة ومستبعدة من المالية</span>
+            هذه الفاتورة تم أرشفتها وهي خارج كافة الحسابات المالية (الإيرادات، الأرباح، التكاليف، ديون العملاء والموردين). هي محفوظة هنا للعرض والرجوع كبيانات فقط.
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main Content */}
@@ -520,6 +590,40 @@ export default function ViewInvoicePage() {
             >
               {deleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin ml-2" />}
               حذف الفاتورة
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Archive Confirmation Dialog */}
+      <Dialog open={archiveConfirm} onOpenChange={setArchiveConfirm}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <Archive className="h-5 w-5" />
+              تأكيد أرشفة الفاتورة
+            </DialogTitle>
+            <DialogDescription className="space-y-3 pt-2 text-foreground/80">
+              <p>
+                هل أنت متأكد من أرشفة الفاتورة رقم{' '}
+                <span className="font-bold text-foreground">#{invoice.invoice_number}</span>؟
+              </p>
+              <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3 text-xs text-amber-800 dark:text-amber-300">
+                ⚠️ بمجرد الأرشفة، ستخرج هذه الفاتورة من كافة الحسابات المالية وتقارير الإيرادات والأرباح ومستحقات الديون، وستبقى فقط كمرجع بيانات.
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setArchiveConfirm(false)}>
+              إلغاء
+            </Button>
+            <Button
+              className="bg-amber-600 hover:bg-amber-700 text-white gap-2"
+              onClick={() => archiveMutation.mutate()}
+              disabled={archiveMutation.isPending}
+            >
+              <Archive className="h-4 w-4" />
+              {archiveMutation.isPending ? 'جاري الأرشفة...' : 'تأكيد الأرشفة'}
             </Button>
           </DialogFooter>
         </DialogContent>
