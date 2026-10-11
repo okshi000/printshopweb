@@ -44,6 +44,8 @@ class Invoice extends Model
     protected $appends = [
         'customer_name',
         'customer_phone',
+        'customer_whatsapp_name',
+        'customer_whatsapp_phone',
         'total_amount',
     ];
 
@@ -126,6 +128,16 @@ class Invoice extends Model
     public function getCustomerPhoneAttribute(): ?string
     {
         return $this->customer?->phone;
+    }
+
+    public function getCustomerWhatsappNameAttribute(): ?string
+    {
+        return $this->customer?->whatsapp_name;
+    }
+
+    public function getCustomerWhatsappPhoneAttribute(): ?string
+    {
+        return $this->customer?->whatsapp_phone;
     }
 
     public function getTotalAmountAttribute(): float

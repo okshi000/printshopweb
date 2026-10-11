@@ -19,7 +19,9 @@ class CustomerController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                   ->orWhere('phone', 'like', "%{$search}%")
-                  ->orWhere('phone2', 'like', "%{$search}%");
+                  ->orWhere('phone2', 'like', "%{$search}%")
+                  ->orWhere('whatsapp_name', 'like', "%{$search}%")
+                  ->orWhere('whatsapp_phone', 'like', "%{$search}%");
             });
         }
 
@@ -46,6 +48,8 @@ class CustomerController extends Controller
             'name' => 'required|string|max:100|unique:customers,name',
             'phone' => 'nullable|string|max:20',
             'phone2' => 'nullable|string|max:20',
+            'whatsapp_name' => 'nullable|string|max:100',
+            'whatsapp_phone' => 'nullable|string|max:20',
             'address' => 'nullable|string',
             'notes' => 'nullable|string',
         ], [
@@ -87,6 +91,8 @@ class CustomerController extends Controller
             'name' => 'required|string|max:100|unique:customers,name,' . $customer->id,
             'phone' => 'nullable|string|max:20',
             'phone2' => 'nullable|string|max:20',
+            'whatsapp_name' => 'nullable|string|max:100',
+            'whatsapp_phone' => 'nullable|string|max:20',
             'address' => 'nullable|string',
             'notes' => 'nullable|string',
             'is_active' => 'boolean',

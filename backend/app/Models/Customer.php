@@ -11,6 +11,8 @@ class Customer extends Model
         'name',
         'phone',
         'phone2',
+        'whatsapp_name',
+        'whatsapp_phone',
         'address',
         'notes',
         'is_active',

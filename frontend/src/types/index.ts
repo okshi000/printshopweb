@@ -3,6 +3,8 @@ export interface Customer {
   name: string;
   phone: string | null;
   phone2: string | null;
+  whatsapp_name?: string | null;
+  whatsapp_phone?: string | null;
   address: string | null;
   notes: string | null;
   is_active: boolean;

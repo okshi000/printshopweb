@@ -7,7 +7,7 @@ import { format } from 'date-fns'
 import { ar } from 'date-fns/locale'
 import {
   ArrowLeft, User, Phone, Mail, MapPin, Calendar, Edit, FileText,
-  TrendingUp, Clock, CheckCircle2, AlertCircle
+  TrendingUp, Clock, CheckCircle2, AlertCircle, MessageCircle
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -46,6 +46,8 @@ interface Customer {
   id: number
   name: string
   phone?: string
+  whatsapp_name?: string
+  whatsapp_phone?: string
   email?: string
   address?: string
   notes?: string
@@ -157,7 +159,39 @@ export default function CustomerViewPage() {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">الهاتف</p>
-                      <p className="font-medium">{customer.phone}</p>
+                      <p className="font-medium" dir="ltr">{customer.phone}</p>
+                    </div>
+                  </div>
+                )}
+                {customer.whatsapp_name && (
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-950">
+                      <MessageCircle className="h-5 w-5 text-[#25D366]" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">اسم العميل على واتساب</p>
+                      <p className="font-semibold text-emerald-700 dark:text-emerald-400">{customer.whatsapp_name}</p>
+                    </div>
+                  </div>
+                )}
+                {customer.whatsapp_phone && (
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-950">
+                      <MessageCircle className="h-5 w-5 text-[#25D366]" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">رقم واتساب</p>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-medium" dir="ltr">{customer.whatsapp_phone}</span>
+                        <a
+                          href={`https://wa.me/${customer.whatsapp_phone.replace(/[^0-9]/g, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs px-2 py-0.5 rounded bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#128C7E] dark:text-[#25D366] font-semibold"
+                        >
+                          محادثة
+                        </a>
+                      </div>
                     </div>
                   </div>
                 )}

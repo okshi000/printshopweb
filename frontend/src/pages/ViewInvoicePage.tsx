@@ -10,7 +10,7 @@ import { ar } from 'date-fns/locale'
 import {
   ArrowLeft, Printer, Edit, CreditCard, User, Calendar, Clock, 
   CheckCircle2, AlertCircle, Loader2, Package, Coins, Receipt, Trash2,
-  Archive, ArchiveRestore, Info
+  Archive, ArchiveRestore, Info, ExternalLink, MessageCircle
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -72,6 +72,17 @@ interface Invoice {
   customer_id: number
   customer_name: string
   customer_phone?: string
+  customer_whatsapp_name?: string
+  customer_whatsapp_phone?: string
+  customer?: {
+    id: number
+    name: string
+    phone?: string
+    phone2?: string
+    whatsapp_name?: string
+    whatsapp_phone?: string
+    address?: string
+  }
   status: string
   is_archived?: boolean
   archived_at?: string | null
@@ -316,7 +327,41 @@ export default function ViewInvoicePage() {
                   {invoice.customer_phone && (
                     <div>
                       <p className="text-sm text-muted-foreground">الهاتف</p>
-                      <p className="font-medium">{invoice.customer_phone}</p>
+                      <p className="font-medium" dir="ltr">{invoice.customer_phone}</p>
+                    </div>
+                  )}
+                  {(invoice.customer_whatsapp_name || invoice.customer?.whatsapp_name) && (
+                    <div>
+                      <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                        <MessageCircle className="h-3.5 w-3.5 text-[#25D366]" />
+                        اسم العميل على واتساب
+                      </p>
+                      <p className="font-semibold text-emerald-700 dark:text-emerald-400 mt-0.5">
+                        {invoice.customer_whatsapp_name || invoice.customer?.whatsapp_name}
+                      </p>
+                    </div>
+                  )}
+                  {(invoice.customer_whatsapp_phone || invoice.customer?.whatsapp_phone) && (
+                    <div>
+                      <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                        <MessageCircle className="h-3.5 w-3.5 text-[#25D366]" />
+                        رقم العميل على واتساب
+                      </p>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        <span className="font-bold tracking-wide" dir="ltr">
+                          {invoice.customer_whatsapp_phone || invoice.customer?.whatsapp_phone}
+                        </span>
+                        <a
+                          href={`https://wa.me/${(invoice.customer_whatsapp_phone || invoice.customer?.whatsapp_phone || '').replace(/[^0-9]/g, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#128C7E] dark:text-[#25D366] font-semibold transition-colors"
+                          title="فتح محادثة واتساب مباشرة"
+                        >
+                          <span>محادثة واتساب</span>
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </div>
                     </div>
                   )}
                   {invoice.delivery_date && (

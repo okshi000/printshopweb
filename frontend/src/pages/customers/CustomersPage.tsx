@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -18,6 +18,7 @@ import {
   FileText,
   Loader2,
   Users,
+  MessageCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,6 +58,8 @@ const customerSchema = z.object({
   name: z.string().min(1, 'اسم العميل مطلوب'),
   phone: z.string().optional(),
   phone2: z.string().optional(),
+  whatsapp_name: z.string().optional(),
+  whatsapp_phone: z.string().optional(),
   address: z.string().optional(),
   notes: z.string().optional(),
   is_active: z.boolean().optional(),
@@ -90,6 +93,8 @@ export default function CustomersPage() {
       name: '',
       phone: '',
       phone2: '',
+      whatsapp_name: '',
+      whatsapp_phone: '',
       address: '',
       notes: '',
       is_active: true,
@@ -147,6 +152,8 @@ export default function CustomersPage() {
       name: customer.name,
       phone: customer.phone || '',
       phone2: customer.phone2 || '',
+      whatsapp_name: customer.whatsapp_name || '',
+      whatsapp_phone: customer.whatsapp_phone || '',
       address: customer.address || '',
       notes: customer.notes || '',
       is_active: customer.is_active,
@@ -470,6 +477,33 @@ export default function CustomersPage() {
                 />
               </div>
             </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
+              <div className="space-y-2">
+                <Label htmlFor="whatsapp_name" className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                  <MessageCircle className="h-3.5 w-3.5 text-[#25D366]" />
+                  اسم العميل على واتساب
+                </Label>
+                <Input
+                  id="whatsapp_name"
+                  placeholder="مثال: أبو أحمد"
+                  {...form.register('whatsapp_name')}
+                  className="bg-background"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="whatsapp_phone" className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                  <MessageCircle className="h-3.5 w-3.5 text-[#25D366]" />
+                  رقم العميل على واتساب
+                </Label>
+                <Input
+                  id="whatsapp_phone"
+                  placeholder="09xxxxxxxx أو 218xxxxxxxx"
+                  dir="ltr"
+                  {...form.register('whatsapp_phone')}
+                  className="bg-background font-mono text-left"
+                />
+              </div>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="address">العنوان</Label>
               <Textarea
@@ -556,6 +590,37 @@ export default function CustomersPage() {
                     هاتف إضافي
                   </div>
                   <p className="font-mono">{selectedCustomer.phone2 || '-'}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                    <MessageCircle className="h-4 w-4 text-[#25D366]" />
+                    اسم العميل على واتساب
+                  </div>
+                  <p className="font-semibold text-emerald-700 dark:text-emerald-400">
+                    {selectedCustomer.whatsapp_name || '-'}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                    <MessageCircle className="h-4 w-4 text-[#25D366]" />
+                    رقم واتساب
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-mono" dir="ltr">{selectedCustomer.whatsapp_phone || '-'}</p>
+                    {selectedCustomer.whatsapp_phone && (
+                      <a
+                        href={`https://wa.me/${selectedCustomer.whatsapp_phone.replace(/[^0-9]/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs px-2 py-0.5 rounded bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#128C7E] dark:text-[#25D366] font-semibold"
+                      >
+                        محادثة
+                      </a>
+                    )}
+                  </div>
                 </div>
               </div>
 
