@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\AccountantController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\SettingController;
+use App\Http\Controllers\Api\KanbanController;
 use App\Http\Controllers\ReportsController;
 
 // Public routes
@@ -56,6 +57,14 @@ Route::middleware(['auth:sanctum', 'api.permission'])->group(function () {
     Route::post('/invoices/{invoice}/archive', [InvoiceController::class, 'archive']);
     Route::post('/invoices/{invoice}/unarchive', [InvoiceController::class, 'unarchive']);
     Route::get('/invoices-statistics', [InvoiceController::class, 'statistics']);
+
+    // Kanban Board - لوحة كانبان لمتابعة مراحل الإنتاج
+    Route::prefix('kanban')->group(function () {
+        Route::get('/', [KanbanController::class, 'index']);
+        Route::patch('/cards/{card}', [KanbanController::class, 'updateCard']);
+        Route::post('/invoices/{invoice}/batch-deliver', [KanbanController::class, 'batchDeliver']);
+        Route::post('/sync', [KanbanController::class, 'syncMissing']);
+    });
 
     // Expenses
     Route::apiResource('expenses', ExpenseController::class)->except(['update']);

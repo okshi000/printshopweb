@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class InvoiceItem extends Model
 {
@@ -41,6 +42,11 @@ class InvoiceItem extends Model
     public function costs(): HasMany
     {
         return $this->hasMany(ItemCost::class);
+    }
+
+    public function kanbanCard(): HasOne
+    {
+        return $this->hasOne(KanbanCard::class, 'invoice_item_id');
     }
 
     public function recalculateTotals(): void

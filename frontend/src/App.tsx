@@ -16,6 +16,7 @@ import InvoicesPage from './pages/InvoicesPage';
 import CreateInvoicePage from './pages/CreateInvoicePage';
 import ViewInvoicePage from './pages/ViewInvoicePage';
 import PrintInvoicePage from './pages/PrintInvoicePage';
+import KanbanPage from './pages/KanbanPage';
 import ExpensesPage from './pages/ExpensesPage';
 import CashPage from './pages/CashPage';
 import DebtsPage from './pages/DebtsPage';
@@ -89,6 +90,7 @@ function App() {
                   <Route path="invoices/:id" element={<ViewInvoicePage />} />
                   <Route path="invoices/:id/edit" element={<CreateInvoicePage />} />
                   <Route path="invoices/:id/print" element={<PrintInvoicePage />} />
+                  <Route path="kanban" element={<KanbanPage />} />
                   <Route path="cash" element={<CashPage />} />
                   <Route path="expenses" element={<ExpensesPage />} />
                   <Route path="inventory" element={<InventoryPage />} />

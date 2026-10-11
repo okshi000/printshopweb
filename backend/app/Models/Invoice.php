@@ -84,6 +84,11 @@ class Invoice extends Model
         return $this->hasMany(InvoicePayment::class);
     }
 
+    public function kanbanCards(): HasMany
+    {
+        return $this->hasMany(KanbanCard::class);
+    }
+
     public static function generateInvoiceNumber(): string
     {
         $year = date('Y');

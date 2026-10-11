@@ -106,6 +106,10 @@ class EnsureApiPermission
             return 'invoices.view';
         }
 
+        if ($root === 'kanban') {
+            return $method === 'GET' ? 'invoices.view' : 'invoices.edit';
+        }
+
         if ($root === 'expenses') {
             return $this->crudPermission($method, 'expenses.view', 'expenses.create', 'expenses.create', 'expenses.delete');
         }

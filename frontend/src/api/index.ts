@@ -194,5 +194,69 @@ export const accountantApi = {
   getFinancialHealth: (params?: Record<string, unknown>) => api.get('/accountant/health', { params }),
 };
 
+// Kanban API
+export interface KanbanCardItem {
+  id: number;
+  invoice_id: number;
+  invoice_item_id: number | null;
+  item_name: string;
+  description: string | null;
+  quantity: number;
+  status: 'in_design' | 'in_printing' | 'in_finishing' | 'in_office' | 'delivered';
+  sort_order: number;
+  notes: string | null;
+  assigned_to: number | null;
+  assigned_user?: { id: number; name: string; full_name?: string } | null;
+  delivered_at: string | null;
+  created_at: string;
+  invoice_number?: string;
+  customer_name?: string;
+  customer_id?: number;
+  delivery_date?: string | null;
+  is_overdue: boolean;
+  is_today: boolean;
+  is_tomorrow: boolean;
+  days_left: number | null;
+  completion_stats: {
+    total_items: number;
+    in_office_count: number;
+    delivered_count: number;
+    ready_count: number;
+    is_all_in_office: boolean;
+    is_all_ready: boolean;
+    is_all_delivered: boolean;
+    completion_text: string;
+  };
+}
+
+export interface KanbanBoardResponse {
+  stages: Record<string, string>;
+  columns: {
+    in_design: KanbanCardItem[];
+    in_printing: KanbanCardItem[];
+    in_finishing: KanbanCardItem[];
+    in_office: KanbanCardItem[];
+    delivered: KanbanCardItem[];
+  };
+  counts: {
+    in_design: number;
+    in_printing: number;
+    in_finishing: number;
+    in_office: number;
+    delivered: number;
+    total: number;
+    overdue: number;
+  };
+  customers: Array<{ id: number; name: string }>;
+}
+
+export const kanbanApi = {
+  getBoard: (params?: Record<string, unknown>) => api.get<KanbanBoardResponse>('/kanban', { params }),
+  updateCard: (id: number, data: { status: string; sort_order?: number; notes?: string; assigned_to?: number | null }) =>
+    api.patch<{ message: string; card: KanbanCardItem }>(`/kanban/cards/${id}`, data),
+  batchDeliver: (invoiceId: number) => api.post<{ message: string }>(`/kanban/invoices/${invoiceId}/batch-deliver`),
+  syncMissing: () => api.post<{ message: string; synced_count: number }>('/kanban/sync'),
+};
+
 // تصدير APIs التقارير
 export * from './reports';

@@ -23,6 +23,7 @@ import {
   Menu,
   X,
   Settings,
+  Kanban,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -66,6 +67,7 @@ const navSections: NavSection[] = [
     items: [
       { icon: LayoutDashboard, label: 'لوحة التحكم', to: '/dashboard', permission: 'dashboard.view' },
       { icon: FileText, label: 'الفواتير', to: '/invoices', permission: 'invoices.view' },
+      { icon: Kanban, label: 'لوحة المراحل (كانبان)', to: '/kanban', permission: 'invoices.view' },
       { icon: Plus, label: 'فاتورة جديدة', to: '/invoices/create', color: 'success', permission: 'invoices.create' },
     ],
   },
