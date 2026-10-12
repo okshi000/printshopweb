@@ -51,6 +51,15 @@ interface Invoice {
   invoice_number: string
   customer_name: string
   customer_phone?: string
+  customer_whatsapp_name?: string
+  customer_whatsapp_phone?: string
+  customer?: {
+    name?: string
+    phone?: string
+    whatsapp_name?: string
+    whatsapp_phone?: string
+    address?: string
+  }
   customer_address?: string
   phone?: string
   status: string
@@ -124,7 +133,9 @@ interface PrintableInvoiceProps {
 const PrintableInvoice = ({ invoice, settings }: PrintableInvoiceProps) => {
   const totalAmount = invoice.total || invoice.total_amount || 0
   const subtotal = invoice.subtotal || totalAmount
-  const customerPhone = invoice.customer_phone || invoice.phone
+  const customerPhone = invoice.customer_phone || invoice.phone || invoice.customer?.phone
+  const customerWhatsappName = invoice.customer_whatsapp_name || invoice.customer?.whatsapp_name
+  const customerWhatsappPhone = invoice.customer_whatsapp_phone || invoice.customer?.whatsapp_phone
   const payments = invoice.payments || []
   
   const companyPhone = settings?.company_phone || '0910275552'
@@ -281,8 +292,14 @@ const PrintableInvoice = ({ invoice, settings }: PrintableInvoiceProps) => {
       <div style={styles.infoGrid}>
         <div style={styles.infoBox}>
           <h3 style={styles.infoBoxTitle}>بيانات العميل</h3>
-          <p><strong>الاسم:</strong> {invoice.customer_name}</p>
-          {customerPhone && <p><strong>الهاتف:</strong> {customerPhone}</p>}
+          <p><strong>اسم العميل:</strong> {invoice.customer_name || invoice.customer?.name || 'عميل نقدي'}</p>
+          <p><strong>رقم الهاتف:</strong> {customerPhone || '-'}</p>
+          {customerWhatsappName && (
+            <p><strong>اسم العميل على واتساب:</strong> {customerWhatsappName}</p>
+          )}
+          {customerWhatsappPhone && (
+            <p><strong>رقم الهاتف على واتساب:</strong> {customerWhatsappPhone}</p>
+          )}
           {invoice.customer_address && <p><strong>العنوان:</strong> {invoice.customer_address}</p>}
         </div>
 

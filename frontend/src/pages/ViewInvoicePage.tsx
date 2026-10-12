@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { ar } from 'date-fns/locale'
 import {
-  ArrowLeft, Printer, Edit, CreditCard, User, Calendar, Clock, 
+  ArrowLeft, Printer, Edit, CreditCard, User, Phone, Calendar, Clock, 
   CheckCircle2, AlertCircle, Loader2, Package, Coins, Receipt, Trash2,
   Archive, ArchiveRestore, Info, ExternalLink, MessageCircle
 } from 'lucide-react'
@@ -312,72 +312,90 @@ export default function ViewInvoicePage() {
         <div className="lg:col-span-2 space-y-6">
           {/* Customer Info */}
           <motion.div variants={fadeInUp}>
-            <Card>
-              <CardHeader>
+            <Card className="overflow-hidden border shadow-sm">
+              <CardHeader className="bg-muted/30 pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <User className="h-5 w-5" /> معلومات العميل
+                  <User className="h-5 w-5 text-primary" /> معلومات العميل
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <p className="text-sm text-muted-foreground">الاسم</p>
-                    <p className="font-medium">{invoice.customer_name}</p>
+              <CardContent className="pt-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {/* اسم العميل */}
+                  <div className="p-3 rounded-lg border bg-card/60">
+                    <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                      <User className="h-4 w-4 text-primary" />
+                      اسم العميل
+                    </p>
+                    <p className="font-semibold text-base mt-1 text-foreground">
+                      {invoice.customer_name || invoice.customer?.name || 'عميل نقدي'}
+                    </p>
                   </div>
-                  {invoice.customer_phone && (
-                    <div>
-                      <p className="text-sm text-muted-foreground">الهاتف</p>
-                      <p className="font-medium" dir="ltr">{invoice.customer_phone}</p>
-                    </div>
-                  )}
-                  {(invoice.customer_whatsapp_name || invoice.customer?.whatsapp_name) && (
-                    <div>
-                      <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                        <MessageCircle className="h-3.5 w-3.5 text-[#25D366]" />
-                        اسم العميل على واتساب
-                      </p>
-                      <p className="font-semibold text-emerald-700 dark:text-emerald-400 mt-0.5">
-                        {invoice.customer_whatsapp_name || invoice.customer?.whatsapp_name}
-                      </p>
-                    </div>
-                  )}
-                  {(invoice.customer_whatsapp_phone || invoice.customer?.whatsapp_phone) && (
-                    <div>
-                      <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                        <MessageCircle className="h-3.5 w-3.5 text-[#25D366]" />
-                        رقم العميل على واتساب
-                      </p>
-                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        <span className="font-bold tracking-wide" dir="ltr">
-                          {invoice.customer_whatsapp_phone || invoice.customer?.whatsapp_phone}
-                        </span>
+
+                  {/* رقم الهاتف */}
+                  <div className="p-3 rounded-lg border bg-card/60">
+                    <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                      <Phone className="h-4 w-4 text-primary" />
+                      رقم الهاتف
+                    </p>
+                    <p className="font-semibold text-base mt-1 text-foreground" dir="ltr">
+                      {invoice.customer_phone || invoice.customer?.phone || '-'}
+                    </p>
+                  </div>
+
+                  {/* اسم العميل على واتساب */}
+                  <div className="p-3 rounded-lg border bg-emerald-500/5 border-emerald-500/20">
+                    <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                      <MessageCircle className="h-4 w-4 text-[#25D366]" />
+                      اسم العميل على واتساب
+                    </p>
+                    <p className="font-semibold text-base mt-1 text-emerald-700 dark:text-emerald-400">
+                      {invoice.customer_whatsapp_name || invoice.customer?.whatsapp_name || '-'}
+                    </p>
+                  </div>
+
+                  {/* رقم الهاتف على واتساب */}
+                  <div className="p-3 rounded-lg border bg-emerald-500/5 border-emerald-500/20">
+                    <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                      <MessageCircle className="h-4 w-4 text-[#25D366]" />
+                      رقم الهاتف على واتساب
+                    </p>
+                    <div className="flex items-center justify-between gap-2 mt-1 flex-wrap">
+                      <span className="font-bold text-base tracking-wide text-foreground" dir="ltr">
+                        {invoice.customer_whatsapp_phone || invoice.customer?.whatsapp_phone || '-'}
+                      </span>
+                      {(invoice.customer_whatsapp_phone || invoice.customer?.whatsapp_phone) && (
                         <a
                           href={`https://wa.me/${(invoice.customer_whatsapp_phone || invoice.customer?.whatsapp_phone || '').replace(/[^0-9]/g, '')}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#128C7E] dark:text-[#25D366] font-semibold transition-colors"
+                          className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md bg-[#25D366] hover:bg-[#20ba59] text-white font-medium shadow-sm transition-colors"
                           title="فتح محادثة واتساب مباشرة"
                         >
+                          <MessageCircle className="h-3.5 w-3.5" />
                           <span>محادثة واتساب</span>
                           <ExternalLink className="h-3 w-3" />
                         </a>
-                      </div>
+                      )}
                     </div>
-                  )}
+                  </div>
+
                   {invoice.delivery_date && (
-                    <div>
-                      <p className="text-sm text-muted-foreground">تاريخ التسليم</p>
-                      <p className="font-medium flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
+                    <div className="sm:col-span-2 p-3 rounded-lg border bg-card/60">
+                      <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        تاريخ التسليم
+                      </p>
+                      <p className="font-medium mt-1">
                         {formatDate(invoice.delivery_date, 'PPP', { locale: ar })}
                       </p>
                     </div>
                   )}
                 </div>
+
                 {invoice.notes && (
-                  <div className="mt-4 pt-4 border-t">
-                    <p className="text-sm text-muted-foreground">ملاحظات</p>
-                    <p className="mt-1">{invoice.notes}</p>
+                  <div className="mt-4 pt-3 border-t">
+                    <p className="text-xs font-medium text-muted-foreground">ملاحظات</p>
+                    <p className="mt-1 text-sm">{invoice.notes}</p>
                   </div>
                 )}
               </CardContent>
