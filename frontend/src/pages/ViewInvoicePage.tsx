@@ -10,7 +10,7 @@ import { ar } from 'date-fns/locale'
 import {
   ArrowLeft, Printer, Edit, CreditCard, User, Phone, Calendar, Clock, 
   CheckCircle2, AlertCircle, Loader2, Package, Coins, Receipt, Trash2,
-  Archive, ArchiveRestore, Info, ExternalLink, MessageCircle
+  Archive, ArchiveRestore, Info, ExternalLink, MessageCircle, Tag
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -86,6 +86,8 @@ interface Invoice {
   status: string
   is_archived?: boolean
   archived_at?: string | null
+  subtotal?: number
+  discount?: number
   total_amount: number
   paid_amount: number
   remaining_amount: number
@@ -118,6 +120,9 @@ export default function ViewInvoicePage() {
   const [paymentNotes, setPaymentNotes] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [archiveConfirm, setArchiveConfirm] = useState(false)
+  const [discountOpen, setDiscountOpen] = useState(false)
+  const [discountVal, setDiscountVal] = useState('')
+  const [discountType, setDiscountType] = useState<'fixed' | 'percentage'>('fixed')
 
   const { data: invoice, isLoading, error } = useQuery<Invoice>({
     queryKey: ['invoice', id],
@@ -191,6 +196,25 @@ export default function ViewInvoicePage() {
     },
     onError: (error: any) => toast.error(error.response?.data?.message || 'فشل استعادة الفاتورة'),
   })
+
+  const discountMutation = useMutation({
+    mutationFn: async (amount: number) => invoicesApi.update(Number(id), { discount: amount }),
+    onSuccess: () => {
+      toast.success('تم حفظ الخصم بنجاح')
+      queryClient.invalidateQueries({ queryKey: ['invoice', id] })
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      setDiscountOpen(false)
+    },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'فشل حفظ الخصم'),
+  })
+
+  const openDiscountDialog = () => {
+    const currentDiscount = Number(invoice?.discount || 0)
+    setDiscountVal(currentDiscount > 0 ? currentDiscount.toString() : '')
+    setDiscountType('fixed')
+    setDiscountOpen(true)
+  }
 
   if (isLoading) {
     return (
@@ -500,13 +524,39 @@ export default function ViewInvoicePage() {
         <motion.div variants={fadeInUp} className="space-y-6">
           {/* Summary */}
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
               <CardTitle className="text-lg">ملخص الفاتورة</CardTitle>
+              {!invoice.is_archived && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 text-xs text-primary border-primary/20 hover:bg-primary/10"
+                  onClick={openDiscountDialog}
+                >
+                  <Tag className="h-3.5 w-3.5" />
+                  {Number(invoice.discount || 0) > 0 ? 'تعديل الخصم' : 'إضافة خصم'}
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">المجموع:</span>
-                <span className="font-medium">{formatCurrency(invoice.total_amount)}</span>
+                <span className="text-muted-foreground">المجموع الفرعي:</span>
+                <span className="font-medium">
+                  {formatCurrency(Number(invoice.subtotal || 0) || (Number(invoice.total_amount) + Number(invoice.discount || 0)))}
+                </span>
+              </div>
+              {Number(invoice.discount || 0) > 0 && (
+                <div className="flex justify-between items-center text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2.5 py-1.5 rounded-lg border border-rose-500/20">
+                  <span className="flex items-center gap-1.5 text-xs font-semibold">
+                    <Tag className="h-3.5 w-3.5" />
+                    الخصم على الفاتورة:
+                  </span>
+                  <span className="font-bold text-sm" dir="ltr">- {formatCurrency(Number(invoice.discount || 0))}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground font-semibold">الإجمالي الكلي:</span>
+                <span className="font-bold text-lg text-primary">{formatCurrency(invoice.total_amount)}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">حالة الدفع:</span>
@@ -689,6 +739,134 @@ export default function ViewInvoicePage() {
               {archiveMutation.isPending ? 'جاري الأرشفة...' : 'تأكيد الأرشفة'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Discount Dialog */}
+      <Dialog open={discountOpen} onOpenChange={setDiscountOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Tag className="h-5 w-5 text-primary" />
+              إضافة / تعديل خصم على الفاتورة
+            </DialogTitle>
+            <DialogDescription>
+              حدد مبلغ أو نسبة الخصم لتطبيقها على إجمالي الفاتورة
+            </DialogDescription>
+          </DialogHeader>
+
+          {invoice && (() => {
+            const currentSubtotal = Number(invoice.subtotal || 0) || (Number(invoice.total_amount) + Number(invoice.discount || 0))
+            const rawVal = parseFloat(discountVal) || 0
+            const previewDiscount = discountType === 'percentage'
+              ? (currentSubtotal * Math.min(100, Math.max(0, rawVal))) / 100
+              : Math.min(currentSubtotal, Math.max(0, rawVal))
+            const previewTotal = Math.max(0, currentSubtotal - previewDiscount)
+            const previewRemaining = Math.max(0, previewTotal - Number(invoice.paid_amount || 0))
+
+            return (
+              <div className="space-y-4 py-2">
+                <div className="flex justify-between items-center p-3 rounded-lg bg-muted/50 border text-sm">
+                  <span className="text-muted-foreground">المجموع الفرعي الحالي:</span>
+                  <span className="font-bold text-base">{formatCurrency(currentSubtotal)}</span>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold">نوع الخصم</Label>
+                    <div className="flex items-center rounded-md border bg-background p-0.5 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setDiscountType('fixed')}
+                        className={cn(
+                          "px-2.5 py-1 rounded text-xs font-medium transition-colors",
+                          discountType === 'fixed' ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        مبلغ نقدي (د.ل)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDiscountType('percentage')}
+                        className={cn(
+                          "px-2.5 py-1 rounded text-xs font-medium transition-colors",
+                          discountType === 'percentage' ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        نسبة مئوية (%)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      min="0"
+                      max={discountType === 'percentage' ? 100 : currentSubtotal}
+                      step="any"
+                      placeholder={discountType === 'percentage' ? "0 %" : "0.00 د.ل"}
+                      value={discountVal}
+                      onChange={(e) => setDiscountVal(e.target.value)}
+                      className="pl-9 font-mono text-base"
+                      dir="ltr"
+                      autoFocus
+                    />
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-semibold pointer-events-none">
+                      {discountType === 'percentage' ? '%' : 'د.ل'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* معاينة الحسابات */}
+                <div className="rounded-lg border bg-card p-3 space-y-2 text-sm">
+                  <div className="flex justify-between items-center text-rose-600 dark:text-rose-400 font-medium">
+                    <span>مبلغ الخصم المحسوب:</span>
+                    <span className="font-bold" dir="ltr">- {formatCurrency(previewDiscount)}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-t pt-2">
+                    <span className="font-semibold text-foreground">الإجمالي الجديد:</span>
+                    <span className="font-bold text-base text-primary">{formatCurrency(previewTotal)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs text-muted-foreground">
+                    <span>المتبقي الجديد بعد الدفعات:</span>
+                    <span className={cn("font-semibold", previewRemaining > 0 ? "text-red-600" : "text-emerald-600")}>
+                      {formatCurrency(previewRemaining)}
+                    </span>
+                  </div>
+                </div>
+
+                <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-between gap-2 pt-2">
+                  <div>
+                    {Number(invoice.discount || 0) > 0 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-xs w-full sm:w-auto"
+                        onClick={() => discountMutation.mutate(0)}
+                        disabled={discountMutation.isPending}
+                      >
+                        إلغاء الخصم (0 د.ل)
+                      </Button>
+                    )}
+                  </div>
+                  <div className="flex gap-2 w-full sm:w-auto justify-end">
+                    <Button type="button" variant="outline" onClick={() => setDiscountOpen(false)}>
+                      إلغاء
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => discountMutation.mutate(previewDiscount)}
+                      disabled={discountMutation.isPending}
+                      className="gap-1.5"
+                    >
+                      {discountMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                      حفظ الخصم
+                    </Button>
+                  </div>
+                </DialogFooter>
+              </div>
+            )
+          })()}
         </DialogContent>
       </Dialog>
     </motion.div>

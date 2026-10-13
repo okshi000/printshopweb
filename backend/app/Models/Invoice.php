@@ -105,12 +105,14 @@ class Invoice extends Model
 
     public function recalculateTotals(): void
     {
-        $this->subtotal = $this->items()->sum('total_price');
-        $this->total = $this->subtotal - $this->discount;
-        $this->total_cost = $this->items()->sum('total_cost');
+        $this->subtotal = (float) $this->items()->sum('total_price');
+        $discount = max(0, (float) ($this->discount ?? 0));
+        $this->discount = $discount;
+        $this->total = max(0, $this->subtotal - $discount);
+        $this->total_cost = (float) $this->items()->sum('total_cost');
         $this->profit = $this->total - $this->total_cost;
-        $this->paid_amount = $this->payments()->sum('amount');
-        $this->remaining_amount = $this->total - $this->paid_amount;
+        $this->paid_amount = (float) $this->payments()->sum('amount');
+        $this->remaining_amount = max(0, $this->total - $this->paid_amount);
         $this->save();
     }
 

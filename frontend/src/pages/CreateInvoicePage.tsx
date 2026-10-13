@@ -8,7 +8,7 @@ import { format } from 'date-fns'
 import { ar } from 'date-fns/locale'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
-  Plus, Trash2, ArrowLeft, Package, Coins, Receipt, Loader2, Calendar as CalendarIcon
+  Plus, Trash2, ArrowLeft, Package, Coins, Receipt, Loader2, Calendar as CalendarIcon, Tag
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -69,6 +69,8 @@ export default function CreateInvoicePage() {
   const [deliveryDate, setDeliveryDate] = useState<Date | null>(null)
   const [notes, setNotes] = useState('')
   const [isLoadingInvoice, setIsLoadingInvoice] = useState(false)
+  const [discountValue, setDiscountValue] = useState<string>('')
+  const [discountType, setDiscountType] = useState<'fixed' | 'percentage'>('fixed')
 
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false)
   const [productModalItemId, setProductModalItemId] = useState<string | null>(null)
@@ -91,6 +93,10 @@ export default function CreateInvoicePage() {
           setCustomerId(invoice.customer_id?.toString() || '')
           setDeliveryDate(invoice.delivery_date ? new Date(invoice.delivery_date) : null)
           setNotes(invoice.notes || '')
+          if (invoice.discount && Number(invoice.discount) > 0) {
+            setDiscountValue(Number(invoice.discount).toString())
+            setDiscountType('fixed')
+          }
           
           // Convert invoice items to form format
           const formItems: InvoiceItem[] = invoice.items.map((item: any) => ({
@@ -229,6 +235,18 @@ export default function CreateInvoicePage() {
   const subtotal = useMemo(() => items.reduce((sum, item) => sum + (item.quantity * item.price), 0), [items])
   const totalCosts = useMemo(() => items.reduce((sum, item) => sum + item.costs.reduce((cs, c) => cs + (parseFloat(String(c.amount)) || 0), 0), 0), [items])
 
+  const calculatedDiscount = useMemo(() => {
+    const val = parseFloat(discountValue)
+    if (isNaN(val) || val <= 0) return 0
+    if (discountType === 'percentage') {
+      const pct = Math.min(100, val)
+      return (subtotal * pct) / 100
+    }
+    return Math.min(subtotal, val)
+  }, [discountValue, discountType, subtotal])
+
+  const finalTotal = useMemo(() => Math.max(0, subtotal - calculatedDiscount), [subtotal, calculatedDiscount])
+
   const handleSubmit = () => {
     if (!customerId) {
       toast.error('يرجى اختيار العميل')
@@ -243,6 +261,7 @@ export default function CreateInvoicePage() {
       customer_id: parseInt(customerId),
       delivery_date: deliveryDate ? format(deliveryDate, 'yyyy-MM-dd') : null,
       notes,
+      discount: calculatedDiscount,
       items: items.map((item) => ({
         product_id: item.product_id ? parseInt(item.product_id) : null,
         quantity: item.quantity,
@@ -456,41 +475,88 @@ export default function CreateInvoicePage() {
               <CardTitle className="text-lg">ملخص الفاتورة</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">المجموع الفرعي:</span>
-                  <span className="font-medium">{formatCurrency(subtotal)}</span>
+                  <span className="font-semibold">{formatCurrency(subtotal)}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">المجموع الفرعي:</span>
-                  <span className="font-medium">{formatCurrency(subtotal)}</span>
+
+                {/* حقل الخصم */}
+                <div className="rounded-lg border bg-muted/40 p-3 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold flex items-center gap-1.5">
+                      <Tag className="h-3.5 w-3.5 text-primary" />
+                      الخصم على الإجمالي
+                    </Label>
+                    <div className="flex items-center rounded-md border bg-background p-0.5 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setDiscountType('fixed')}
+                        className={cn(
+                          "px-2 py-0.5 rounded text-[11px] font-medium transition-colors",
+                          discountType === 'fixed' ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        مبلغ (د.ل)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDiscountType('percentage')}
+                        className={cn(
+                          "px-2 py-0.5 rounded text-[11px] font-medium transition-colors",
+                          discountType === 'percentage' ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        نسبة (%)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      min="0"
+                      max={discountType === 'percentage' ? 100 : subtotal}
+                      step="any"
+                      placeholder={discountType === 'percentage' ? "0 %" : "0.00 د.ل"}
+                      value={discountValue}
+                      onChange={(e) => setDiscountValue(e.target.value)}
+                      className="h-8 text-sm pl-8 font-mono"
+                      dir="ltr"
+                    />
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium pointer-events-none">
+                      {discountType === 'percentage' ? '%' : 'د.ل'}
+                    </span>
+                  </div>
+
+                  {calculatedDiscount > 0 && (
+                    <div className="flex items-center justify-between text-xs text-rose-600 dark:text-rose-400 font-medium pt-1 border-t border-border/50">
+                      <span>الخصم المطبق:</span>
+                      <span className="font-bold" dir="ltr">- {formatCurrency(calculatedDiscount)}</span>
+                    </div>
+                  )}
                 </div>
+
                 {hasPermission('invoices.view_costs') && (
-                  <>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">إجمالي التكاليف:</span>
-                      <span className="font-medium text-orange-600">{formatCurrency(totalCosts)}</span>
-                    </div>
-                    <div className="border-t pt-2">
-                      <div className="flex justify-between">
-                        <span className="font-semibold">الإجمالي:</span>
-                        <span className="text-xl font-bold text-primary">{formatCurrency(subtotal)}</span>
-                      </div>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">صافي الربح:</span>
-                      <span className={cn('font-semibold', subtotal - totalCosts >= 0 ? 'text-emerald-600' : 'text-red-600')}>
-                        {formatCurrency(subtotal - totalCosts)}
-                      </span>
-                    </div>
-                  </>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">إجمالي التكاليف:</span>
+                    <span className="font-medium text-orange-600">{formatCurrency(totalCosts)}</span>
+                  </div>
                 )}
-                {!hasPermission('invoices.view_costs') && (
-                  <div className="border-t pt-2">
-                    <div className="flex justify-between">
-                      <span className="font-semibold">الإجمالي:</span>
-                      <span className="text-xl font-bold text-primary">{formatCurrency(subtotal)}</span>
-                    </div>
+
+                <div className="border-t pt-2">
+                  <div className="flex justify-between items-baseline">
+                    <span className="font-semibold">الإجمالي النهائي:</span>
+                    <span className="text-xl font-bold text-primary">{formatCurrency(finalTotal)}</span>
+                  </div>
+                </div>
+
+                {hasPermission('invoices.view_costs') && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">صافي الربح المتوقع:</span>
+                    <span className={cn('font-semibold', finalTotal - totalCosts >= 0 ? 'text-emerald-600' : 'text-red-600')}>
+                      {formatCurrency(finalTotal - totalCosts)}
+                    </span>
                   </div>
                 )}
               </div>

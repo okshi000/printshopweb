@@ -131,8 +131,9 @@ interface PrintableInvoiceProps {
 }
 
 const PrintableInvoice = ({ invoice, settings }: PrintableInvoiceProps) => {
-  const totalAmount = invoice.total || invoice.total_amount || 0
-  const subtotal = invoice.subtotal || totalAmount
+  const discount = Number(invoice.discount) || 0
+  const totalAmount = Number(invoice.total || invoice.total_amount || 0)
+  const subtotal = invoice.subtotal ? Number(invoice.subtotal) : (totalAmount + discount)
   const customerPhone = invoice.customer_phone || invoice.phone || invoice.customer?.phone
   const customerWhatsappName = invoice.customer_whatsapp_name || invoice.customer?.whatsapp_name
   const customerWhatsappPhone = invoice.customer_whatsapp_phone || invoice.customer?.whatsapp_phone
@@ -351,10 +352,10 @@ const PrintableInvoice = ({ invoice, settings }: PrintableInvoiceProps) => {
                 <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}>الإجمالي الفرعي:</td>
                 <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}>{formatCurrency(subtotal)}</td>
               </tr>
-              {invoice.discount > 0 && (
+              {discount > 0 && (
                 <tr style={{ color: '#d32f2f' }}>
                   <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}>الخصم:</td>
-                  <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}>- {formatCurrency(invoice.discount)}</td>
+                  <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}>- {formatCurrency(discount)}</td>
                 </tr>
               )}
               <tr>

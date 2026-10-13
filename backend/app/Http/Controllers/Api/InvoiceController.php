@@ -221,7 +221,7 @@ class InvoiceController extends Controller
                 'customer_id' => $validated['customer_id'] ?? $invoice->customer_id,
                 'invoice_date' => $validated['invoice_date'] ?? $invoice->invoice_date,
                 'delivery_date' => $validated['delivery_date'] ?? $invoice->delivery_date,
-                'discount' => $validated['discount'] ?? $invoice->discount,
+                'discount' => array_key_exists('discount', $validated) ? max(0, (float) ($validated['discount'] ?? 0)) : $invoice->discount,
                 'notes' => $validated['notes'] ?? $invoice->notes,
                 'status' => $validated['status'] ?? $invoice->status,
             ]);

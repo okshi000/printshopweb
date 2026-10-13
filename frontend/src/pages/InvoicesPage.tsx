@@ -692,9 +692,16 @@ export default function InvoicesPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <span className="font-semibold">
-                              {formatCurrency(total)}
-                            </span>
+                            <div>
+                              <span className="font-semibold">
+                                {formatCurrency(total)}
+                              </span>
+                              {parseFloat(String(invoice.discount || 0)) > 0 && (
+                                <span className="block text-[11px] text-rose-500 font-medium whitespace-nowrap">
+                                  خصم: {formatCurrency(Number(invoice.discount || 0))}
+                                </span>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell>
                             <span className="text-green-600">
