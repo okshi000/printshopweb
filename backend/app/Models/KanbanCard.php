@@ -49,6 +49,11 @@ class KanbanCard extends Model
         return $this->belongsTo(User::class, 'assigned_to');
     }
 
+    public function column(): BelongsTo
+    {
+        return $this->belongsTo(KanbanColumn::class, 'status', 'key');
+    }
+
     public function getCustomerNameAttribute(): ?string
     {
         return $this->invoice?->customer?->name;

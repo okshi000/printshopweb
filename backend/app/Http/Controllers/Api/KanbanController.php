@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\KanbanCard;
+use App\Models\KanbanColumn;
 use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -14,21 +15,38 @@ use Illuminate\Support\Facades\DB;
 class KanbanController extends Controller
 {
     /**
-     * المراحل الـ 5 المعتمدة للوحة الكانبان
+     * التحقق من وجود مراحل في جدول kanban_columns وبذر الافتراضية عند الحاجة
      */
-    public const STAGES = [
-        'in_design'    => 'في التصميم',
-        'in_printing'  => 'في الطباعة',
-        'in_finishing' => 'في التشطيب',
-        'in_office'    => 'في المكتب',
-        'delivered'    => 'تم التسليم',
-    ];
+    protected function ensureDefaultColumnsExist(): void
+    {
+        if (KanbanColumn::count() === 0) {
+            $defaultColumns = [
+                ['key' => 'in_design',    'title' => 'في التصميم',         'color' => 'sky',     'icon' => 'Sparkles',     'sort_order' => 1, 'is_initial' => true,  'is_final' => false],
+                ['key' => 'in_printing',  'title' => 'في الطباعة',         'color' => 'indigo',  'icon' => 'Package',      'sort_order' => 2, 'is_initial' => false, 'is_final' => false],
+                ['key' => 'in_finishing', 'title' => 'في التشطيب',        'color' => 'amber',   'icon' => 'Layers',       'sort_order' => 3, 'is_initial' => false, 'is_final' => false],
+                ['key' => 'in_office',    'title' => 'في المكتب (جاهز)',   'color' => 'emerald', 'icon' => 'Boxes',        'sort_order' => 4, 'is_initial' => false, 'is_final' => false],
+                ['key' => 'delivered',    'title' => 'تم التسليم',        'color' => 'slate',   'icon' => 'CheckCircle2', 'sort_order' => 5, 'is_initial' => false, 'is_final' => true],
+            ];
+
+            foreach ($defaultColumns as $col) {
+                KanbanColumn::create($col);
+            }
+        }
+    }
 
     /**
-     * جلب جميع الكروت مجمعة حسب المراحل الخمس مع حساب نسب الإنجاز والفلترة
+     * جلب جميع الكروت مجمعة حسب المراحل الديناميكية مع نسب الإنجاز والفلترة
      */
     public function index(Request $request): JsonResponse
     {
+        $this->ensureDefaultColumnsExist();
+
+        $columnsConfig = KanbanColumn::orderBy('sort_order', 'asc')->get();
+        $finalKeys = $columnsConfig->where('is_final', true)->pluck('key')->toArray();
+        if (empty($finalKeys)) {
+            $finalKeys = ['delivered'];
+        }
+
         $query = KanbanCard::with([
             'invoice' => function ($q) {
                 $q->with('customer');
@@ -97,25 +115,18 @@ class KanbanController extends Controller
         $invoiceStats = [];
 
         if ($invoiceIds->isNotEmpty()) {
-            $statsRows = KanbanCard::whereIn('invoice_id', $invoiceIds)
-                ->select(
-                    'invoice_id',
-                    DB::raw('COUNT(*) as total_items'),
-                    DB::raw("SUM(CASE WHEN status = 'in_office' THEN 1 ELSE 0 END) as in_office_count"),
-                    DB::raw("SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) as delivered_count")
-                )
-                ->groupBy('invoice_id')
-                ->get();
+            $allInvoiceCards = KanbanCard::whereIn('invoice_id', $invoiceIds)->get();
+            $groupedByInvoice = $allInvoiceCards->groupBy('invoice_id');
 
-            foreach ($statsRows as $row) {
-                $total = (int) $row->total_items;
-                $inOffice = (int) $row->in_office_count;
-                $delivered = (int) $row->delivered_count;
+            foreach ($groupedByInvoice as $invId => $cards) {
+                $total = $cards->count();
+                $delivered = $cards->whereIn('status', $finalKeys)->count();
+                $inOffice = $cards->where('status', 'in_office')->count();
                 $readyOrDelivered = $inOffice + $delivered;
 
-                $isAllInOffice = ($inOffice === $total);
-                $isAllReady = ($readyOrDelivered === $total);
-                $isAllDelivered = ($delivered === $total);
+                $isAllInOffice = ($inOffice === $total && $total > 0);
+                $isAllReady = ($readyOrDelivered === $total && $total > 0);
+                $isAllDelivered = ($delivered === $total && $total > 0);
 
                 $completionText = '';
                 if ($isAllDelivered) {
@@ -126,7 +137,7 @@ class KanbanController extends Controller
                     $completionText = "جاهز - بانتظار اكتمال الطلب ({$readyOrDelivered} من {$total} جاهز)";
                 }
 
-                $invoiceStats[$row->invoice_id] = [
+                $invoiceStats[$invId] = [
                     'total_items' => $total,
                     'in_office_count' => $inOffice,
                     'delivered_count' => $delivered,
@@ -139,15 +150,21 @@ class KanbanController extends Controller
             }
         }
 
-        // تقسيم الكروت للأعمدة الخمسة مع إرفاق حالة التجميع
-        $columns = [
-            'in_design'    => [],
-            'in_printing'  => [],
-            'in_finishing' => [],
-            'in_office'    => [],
-            'delivered'    => [],
+        // تحضير الأعمدة الديناميكية
+        $columns = [];
+        $stagesMap = [];
+        $counts = [
+            'total' => $allCards->count(),
+            'overdue' => 0,
         ];
 
+        foreach ($columnsConfig as $col) {
+            $columns[$col->key] = [];
+            $stagesMap[$col->key] = $col->title;
+            $counts[$col->key] = 0;
+        }
+
+        $initialKey = KanbanColumn::getInitialStageKey();
         $overdueCount = 0;
 
         foreach ($allCards as $card) {
@@ -170,12 +187,14 @@ class KanbanController extends Controller
             $isTomorrow = false;
             $daysLeft = null;
 
+            $isCardDelivered = in_array($card->status, $finalKeys);
+
             if ($deliveryDate) {
                 $deliveryDateStr = $deliveryDate->format('Y-m-d');
                 $diff = (int) now()->startOfDay()->diffInDays($deliveryDate->startOfDay(), false);
                 $daysLeft = $diff;
 
-                if ($card->status !== 'delivered') {
+                if (!$isCardDelivered) {
                     if ($deliveryDateStr < $today) {
                         $isOverdue = true;
                         $overdueCount++;
@@ -215,10 +234,21 @@ class KanbanController extends Controller
                 'completion_stats' => $stats,
             ];
 
+            // إذا كان الكرت ينتمي لمرحلة موجودة
             if (isset($columns[$card->status])) {
                 $columns[$card->status][] = $cardData;
+                $counts[$card->status] = ($counts[$card->status] ?? 0) + 1;
+            } else {
+                // إذا حُذفت مرحلته سابقاً، نضعه مؤقتاً في المرحلة الأولى
+                if (isset($columns[$initialKey])) {
+                    $cardData['status'] = $initialKey;
+                    $columns[$initialKey][] = $cardData;
+                    $counts[$initialKey] = ($counts[$initialKey] ?? 0) + 1;
+                }
             }
         }
+
+        $counts['overdue'] = $overdueCount;
 
         // قائمة العملاء للفلترة
         $customersList = DB::table('customers')
@@ -227,17 +257,10 @@ class KanbanController extends Controller
             ->get();
 
         return response()->json([
-            'stages' => self::STAGES,
+            'columns_config' => $columnsConfig,
+            'stages' => $stagesMap,
             'columns' => $columns,
-            'counts' => [
-                'in_design'    => count($columns['in_design']),
-                'in_printing'  => count($columns['in_printing']),
-                'in_finishing' => count($columns['in_finishing']),
-                'in_office'    => count($columns['in_office']),
-                'delivered'    => count($columns['delivered']),
-                'total'        => $allCards->count(),
-                'overdue'      => $overdueCount,
-            ],
+            'counts' => $counts,
             'customers' => $customersList,
         ]);
     }
@@ -248,7 +271,7 @@ class KanbanController extends Controller
     public function updateCard(Request $request, KanbanCard $card): JsonResponse
     {
         $validated = $request->validate([
-            'status' => 'required|in:in_design,in_printing,in_finishing,in_office,delivered',
+            'status' => 'required|string|max:50|exists:kanban_columns,key',
             'sort_order' => 'nullable|integer',
             'notes' => 'nullable|string',
             'assigned_to' => 'nullable|exists:users,id',
@@ -257,11 +280,16 @@ class KanbanController extends Controller
         $oldStatus = $card->status;
         $newStatus = $validated['status'];
 
-        DB::transaction(function () use ($card, $validated, $newStatus, $oldStatus) {
+        $targetColumn = KanbanColumn::where('key', $newStatus)->first();
+        $isFinal = $targetColumn ? $targetColumn->is_final : ($newStatus === 'delivered');
+        $oldColumn = KanbanColumn::where('key', $oldStatus)->first();
+        $wasFinal = $oldColumn ? $oldColumn->is_final : ($oldStatus === 'delivered');
+
+        DB::transaction(function () use ($card, $validated, $newStatus, $oldStatus, $isFinal, $wasFinal) {
             $deliveredAt = $card->delivered_at;
-            if ($newStatus === 'delivered' && $oldStatus !== 'delivered') {
+            if ($isFinal && !$wasFinal) {
                 $deliveredAt = now();
-            } elseif ($newStatus !== 'delivered') {
+            } elseif (!$isFinal) {
                 $deliveredAt = null;
             }
 
@@ -276,15 +304,20 @@ class KanbanController extends Controller
             // تحديث حالة الفاتورة الأم تلقائياً إذا لزم الأمر
             $invoice = $card->invoice;
             if ($invoice && !$invoice->is_archived) {
+                $finalKeys = KanbanColumn::where('is_final', true)->pluck('key')->toArray();
+                if (empty($finalKeys)) {
+                    $finalKeys = ['delivered'];
+                }
+
                 $totalCards = $invoice->kanbanCards()->count();
-                $deliveredCards = $invoice->kanbanCards()->where('status', 'delivered')->count();
+                $deliveredCards = $invoice->kanbanCards()->whereIn('status', $finalKeys)->count();
                 $inOfficeCards = $invoice->kanbanCards()->where('status', 'in_office')->count();
 
                 if ($totalCards > 0 && $deliveredCards === $totalCards) {
                     $invoice->update(['status' => 'delivered']);
                 } elseif ($totalCards > 0 && ($inOfficeCards + $deliveredCards) === $totalCards) {
                     $invoice->update(['status' => 'ready']);
-                } elseif ($newStatus === 'in_printing' || $newStatus === 'in_finishing') {
+                } elseif (!$isFinal) {
                     if ($invoice->status === 'new') {
                         $invoice->update(['status' => 'in_progress']);
                     }
@@ -292,16 +325,199 @@ class KanbanController extends Controller
             }
         });
 
+        $stageName = KanbanColumn::where('key', $newStatus)->value('title') ?? $newStatus;
+        $oldStageName = KanbanColumn::where('key', $oldStatus)->value('title') ?? $oldStatus;
+
         ActivityLog::log(
             'update',
             'kanban',
-            "نقل البند '{$card->item_name}' (فاتورة {$card->invoice_number}) من " . (self::STAGES[$oldStatus] ?? $oldStatus) . " إلى " . (self::STAGES[$newStatus] ?? $newStatus),
+            "نقل البند '{$card->item_name}' (فاتورة {$card->invoice_number}) من '{$oldStageName}' إلى '{$stageName}'",
             $card->id
         );
 
         return response()->json([
-            'message' => 'تم تحديث حالة البند بنجاح',
+            'message' => 'تم تحديث مرحلة البند بنجاح',
             'card' => $card->fresh(['invoice.customer', 'assignedUser']),
+        ]);
+    }
+
+    /**
+     * جلب قائمة المراحل/الأعمدة مع عدد الكروت في كل مرحلة
+     */
+    public function getColumns(): JsonResponse
+    {
+        $this->ensureDefaultColumnsExist();
+
+        $columns = KanbanColumn::orderBy('sort_order', 'asc')
+            ->get()
+            ->map(function ($col) {
+                $col->cards_count = KanbanCard::where('status', $col->key)
+                    ->whereHas('invoice', function ($q) {
+                        $q->where('is_archived', false);
+                    })
+                    ->count();
+                return $col;
+            });
+
+        return response()->json($columns);
+    }
+
+    /**
+     * إنشاء مرحلة / عمود جديد في لوحة كانبان
+     */
+    public function storeColumn(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'title' => 'required|string|max:100',
+            'key' => 'nullable|string|max:50|regex:/^[a-zA-Z0-9_\-]+$/|unique:kanban_columns,key',
+            'color' => 'nullable|string|max:50',
+            'icon' => 'nullable|string|max:50',
+            'is_initial' => 'nullable|boolean',
+            'is_final' => 'nullable|boolean',
+        ]);
+
+        $key = !empty($validated['key'])
+            ? strtolower(trim($validated['key']))
+            : KanbanColumn::generateUniqueKey($validated['title']);
+
+        $nextSort = (int) (KanbanColumn::max('sort_order') ?? 0) + 1;
+        $isInitial = !empty($validated['is_initial']);
+
+        if ($isInitial) {
+            // إلغاء الافتراضي عن باقي الأعمدة لضمان وجود عمود أولي وحيد
+            KanbanColumn::where('is_initial', true)->update(['is_initial' => false]);
+        }
+
+        $column = KanbanColumn::create([
+            'key' => $key,
+            'title' => trim($validated['title']),
+            'color' => $validated['color'] ?? 'sky',
+            'icon' => $validated['icon'] ?? 'Layers',
+            'sort_order' => $nextSort,
+            'is_initial' => $isInitial,
+            'is_final' => !empty($validated['is_final']),
+        ]);
+
+        ActivityLog::log(
+            'create',
+            'kanban',
+            "إضافة مرحلة جديدة في لوحة كانبان: '{$column->title}'",
+            $column->id
+        );
+
+        return response()->json([
+            'message' => 'تم إنشاء المرحلة بنجاح',
+            'column' => $column,
+        ], 201);
+    }
+
+    /**
+     * تحديث بيانات مرحلة / عمود
+     */
+    public function updateColumn(Request $request, KanbanColumn $column): JsonResponse
+    {
+        $validated = $request->validate([
+            'title' => 'sometimes|required|string|max:100',
+            'color' => 'nullable|string|max:50',
+            'icon' => 'nullable|string|max:50',
+            'is_initial' => 'nullable|boolean',
+            'is_final' => 'nullable|boolean',
+            'sort_order' => 'nullable|integer',
+        ]);
+
+        if (isset($validated['is_initial']) && $validated['is_initial']) {
+            KanbanColumn::where('id', '!=', $column->id)
+                ->where('is_initial', true)
+                ->update(['is_initial' => false]);
+        }
+
+        $column->update([
+            'title' => isset($validated['title']) ? trim($validated['title']) : $column->title,
+            'color' => $validated['color'] ?? $column->color,
+            'icon' => $validated['icon'] ?? $column->icon,
+            'is_initial' => isset($validated['is_initial']) ? (bool) $validated['is_initial'] : $column->is_initial,
+            'is_final' => isset($validated['is_final']) ? (bool) $validated['is_final'] : $column->is_final,
+            'sort_order' => isset($validated['sort_order']) ? (int) $validated['sort_order'] : $column->sort_order,
+        ]);
+
+        ActivityLog::log(
+            'update',
+            'kanban',
+            "تعديل بيانات المرحلة: '{$column->title}'",
+            $column->id
+        );
+
+        return response()->json([
+            'message' => 'تم تحديث المرحلة بنجاح',
+            'column' => $column,
+        ]);
+    }
+
+    /**
+     * حذف مرحلة / عمود مع نقل الكروت الموجودة إلى مرحلة بديلة
+     */
+    public function destroyColumn(Request $request, KanbanColumn $column): JsonResponse
+    {
+        if (KanbanColumn::count() <= 1) {
+            return response()->json([
+                'message' => 'لا يمكن حذف آخر مرحلة متبقية في لوحة كانبان.',
+            ], 422);
+        }
+
+        $cardsCount = KanbanCard::where('status', $column->key)->count();
+
+        // تحديد المرحلة البديلة لنقل الكروت
+        $fallbackKey = $request->input('fallback_column_key');
+        if (empty($fallbackKey) || !KanbanColumn::where('key', $fallbackKey)->where('id', '!=', $column->id)->exists()) {
+            $fallbackKey = KanbanColumn::where('id', '!=', $column->id)->where('is_initial', true)->value('key')
+                ?? KanbanColumn::where('id', '!=', $column->id)->orderBy('sort_order', 'asc')->value('key');
+        }
+
+        DB::transaction(function () use ($column, $fallbackKey, $cardsCount) {
+            if ($cardsCount > 0 && $fallbackKey) {
+                KanbanCard::where('status', $column->key)->update(['status' => $fallbackKey]);
+            }
+
+            // إذا كانت المرحلة المحذوفة هي الافتراضية، ننقل الافتراضي لأول مرحلة متبقية
+            if ($column->is_initial) {
+                $nextInitial = KanbanColumn::where('id', '!=', $column->id)->orderBy('sort_order', 'asc')->first();
+                if ($nextInitial) {
+                    $nextInitial->update(['is_initial' => true]);
+                }
+            }
+
+            $column->delete();
+        });
+
+        ActivityLog::log(
+            'delete',
+            'kanban',
+            "حذف المرحلة '{$column->title}' ونقل ({$cardsCount}) كرت إلى المرحلة البديلة '{$fallbackKey}'",
+            $column->id
+        );
+
+        return response()->json([
+            'message' => "تم حذف المرحلة '{$column->title}' بنجاح" . ($cardsCount > 0 ? " ونقل {$cardsCount} كرت لمرحلة أخرى" : ''),
+        ]);
+    }
+
+    /**
+     * إعادة ترتيب الأعمدة
+     */
+    public function reorderColumns(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'column_ids' => 'required|array',
+            'column_ids.*' => 'integer|exists:kanban_columns,id',
+        ]);
+
+        foreach ($validated['column_ids'] as $index => $id) {
+            KanbanColumn::where('id', $id)->update(['sort_order' => $index + 1]);
+        }
+
+        return response()->json([
+            'message' => 'تم حفظ ترتيب المراحل بنجاح',
+            'columns' => KanbanColumn::orderBy('sort_order', 'asc')->get(),
         ]);
     }
 
@@ -310,9 +526,11 @@ class KanbanController extends Controller
      */
     public function batchDeliver(Invoice $invoice): JsonResponse
     {
-        DB::transaction(function () use ($invoice) {
+        $finalKey = KanbanColumn::where('is_final', true)->value('key') ?? 'delivered';
+
+        DB::transaction(function () use ($invoice, $finalKey) {
             $invoice->kanbanCards()->update([
-                'status' => 'delivered',
+                'status' => $finalKey,
                 'delivered_at' => now(),
             ]);
 
@@ -336,6 +554,11 @@ class KanbanController extends Controller
      */
     public function syncMissing(): JsonResponse
     {
+        $this->ensureDefaultColumnsExist();
+
+        $initialKey = KanbanColumn::getInitialStageKey();
+        $finalKey = KanbanColumn::where('is_final', true)->value('key') ?? 'delivered';
+
         $count = 0;
         $itemsWithoutCards = InvoiceItem::whereDoesntHave('kanbanCard')
             ->whereHas('invoice', function ($q) {
@@ -346,10 +569,10 @@ class KanbanController extends Controller
 
         foreach ($itemsWithoutCards as $item) {
             $status = match ($item->invoice?->status) {
-                'delivered' => 'delivered',
+                'delivered' => $finalKey,
                 'ready' => 'in_office',
                 'in_progress' => 'in_printing',
-                default => 'in_design',
+                default => $initialKey,
             };
 
             KanbanCard::create([
@@ -360,7 +583,7 @@ class KanbanController extends Controller
                 'quantity' => $item->quantity ?? 1,
                 'status' => $status,
                 'sort_order' => $count++,
-                'delivered_at' => $status === 'delivered' ? now() : null,
+                'delivered_at' => ($status === $finalKey) ? now() : null,
             ]);
         }
 

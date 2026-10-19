@@ -202,7 +202,7 @@ export interface KanbanCardItem {
   item_name: string;
   description: string | null;
   quantity: number;
-  status: 'in_design' | 'in_printing' | 'in_finishing' | 'in_office' | 'delivered';
+  status: string;
   sort_order: number;
   notes: string | null;
   assigned_to: number | null;
@@ -229,21 +229,23 @@ export interface KanbanCardItem {
   };
 }
 
+export interface KanbanColumnItem {
+  id: number;
+  key: string;
+  title: string;
+  color: string;
+  icon: string;
+  sort_order: number;
+  is_initial: boolean;
+  is_final: boolean;
+  cards_count?: number;
+}
+
 export interface KanbanBoardResponse {
+  columns_config: KanbanColumnItem[];
   stages: Record<string, string>;
-  columns: {
-    in_design: KanbanCardItem[];
-    in_printing: KanbanCardItem[];
-    in_finishing: KanbanCardItem[];
-    in_office: KanbanCardItem[];
-    delivered: KanbanCardItem[];
-  };
-  counts: {
-    in_design: number;
-    in_printing: number;
-    in_finishing: number;
-    in_office: number;
-    delivered: number;
+  columns: Record<string, KanbanCardItem[]>;
+  counts: Record<string, number> & {
     total: number;
     overdue: number;
   };
@@ -256,6 +258,15 @@ export const kanbanApi = {
     api.patch<{ message: string; card: KanbanCardItem }>(`/kanban/cards/${id}`, data),
   batchDeliver: (invoiceId: number) => api.post<{ message: string }>(`/kanban/invoices/${invoiceId}/batch-deliver`),
   syncMissing: () => api.post<{ message: string; synced_count: number }>('/kanban/sync'),
+  getColumns: () => api.get<KanbanColumnItem[]>('/kanban/columns'),
+  createColumn: (data: { title: string; key?: string; color?: string; icon?: string; is_initial?: boolean; is_final?: boolean }) =>
+    api.post<{ message: string; column: KanbanColumnItem }>('/kanban/columns', data),
+  updateColumn: (id: number, data: Partial<{ title: string; color: string; icon: string; is_initial: boolean; is_final: boolean; sort_order: number }>) =>
+    api.put<{ message: string; column: KanbanColumnItem }>(`/kanban/columns/${id}`, data),
+  deleteColumn: (id: number, fallbackColumnKey?: string) =>
+    api.delete<{ message: string }>(`/kanban/columns/${id}`, { data: { fallback_column_key: fallbackColumnKey } }),
+  reorderColumns: (columnIds: number[]) =>
+    api.post<{ message: string; columns: KanbanColumnItem[] }>('/kanban/columns/reorder', { column_ids: columnIds }),
 };
 
 // تصدير APIs التقارير

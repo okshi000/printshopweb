@@ -18,7 +18,8 @@ class InvoiceItemObserver
             return;
         }
 
-        $nextSortOrder = (int) (KanbanCard::where('status', 'in_design')->max('sort_order') ?? 0) + 1;
+        $initialStage = \App\Models\KanbanColumn::getInitialStageKey();
+        $nextSortOrder = (int) (KanbanCard::where('status', $initialStage)->max('sort_order') ?? 0) + 1;
 
         KanbanCard::create([
             'invoice_id' => $item->invoice_id,
@@ -26,7 +27,7 @@ class InvoiceItemObserver
             'item_name' => $item->product_name ?? 'بند جديد',
             'description' => $item->description,
             'quantity' => $item->quantity ?? 1,
-            'status' => 'in_design', // الحالة الافتراضية الأولى
+            'status' => $initialStage,
             'sort_order' => $nextSortOrder,
         ]);
     }

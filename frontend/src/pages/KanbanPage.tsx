@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
@@ -17,12 +17,27 @@ import {
   Layers,
   Send,
   Boxes,
+  Scissors,
+  Truck,
+  Palette,
+  Printer,
+  Wrench,
+  Tag,
+  Star,
+  SlidersHorizontal,
+  Plus,
+  Trash2,
+  Edit2,
+  ArrowUp,
+  ArrowDown,
+  Info,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
@@ -37,63 +52,127 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { kanbanApi, type KanbanCardItem, type KanbanBoardResponse } from '@/api';
+import { kanbanApi, type KanbanCardItem, type KanbanBoardResponse, type KanbanColumnItem } from '@/api';
 
-// أعمدة ومراحل الكانبان الخمس
-const STAGES_CONFIG = [
-  {
-    id: 'in_design',
-    title: 'في التصميم',
-    icon: Sparkles,
+// لوحة الألوان المعتمدة للمراحل
+export const STAGE_COLORS: Record<string, {
+  color: string;
+  lightBg: string;
+  border: string;
+  headerBadge: string;
+  ringColor: string;
+  dotColor: string;
+  label: string;
+}> = {
+  sky: {
     color: 'from-sky-500 to-blue-600',
     lightBg: 'bg-sky-500/10 dark:bg-sky-500/15',
     border: 'border-sky-500/40',
     headerBadge: 'bg-sky-500 text-white',
     ringColor: 'ring-sky-500',
+    dotColor: 'bg-sky-500',
+    label: 'سماوي',
   },
-  {
-    id: 'in_printing',
-    title: 'في الطباعة',
-    icon: Package,
+  indigo: {
     color: 'from-indigo-500 to-purple-600',
     lightBg: 'bg-indigo-500/10 dark:bg-indigo-500/15',
     border: 'border-indigo-500/40',
     headerBadge: 'bg-indigo-500 text-white',
     ringColor: 'ring-indigo-500',
+    dotColor: 'bg-indigo-500',
+    label: 'نيلي',
   },
-  {
-    id: 'in_finishing',
-    title: 'في التشطيب',
-    icon: Layers,
+  amber: {
     color: 'from-amber-500 to-orange-600',
     lightBg: 'bg-amber-500/10 dark:bg-amber-500/15',
     border: 'border-amber-500/40',
     headerBadge: 'bg-amber-500 text-white',
     ringColor: 'ring-amber-500',
+    dotColor: 'bg-amber-500',
+    label: 'عنبري',
   },
-  {
-    id: 'in_office',
-    title: 'في المكتب (جاهز)',
-    icon: Boxes,
+  emerald: {
     color: 'from-emerald-500 to-teal-600',
     lightBg: 'bg-emerald-500/10 dark:bg-emerald-500/15',
     border: 'border-emerald-500/40',
     headerBadge: 'bg-emerald-500 text-white',
     ringColor: 'ring-emerald-500',
+    dotColor: 'bg-emerald-500',
+    label: 'زمردي',
   },
-  {
-    id: 'delivered',
-    title: 'تم التسليم',
-    icon: CheckCircle2,
+  slate: {
     color: 'from-slate-500 to-zinc-600',
     lightBg: 'bg-slate-500/10 dark:bg-slate-500/15',
     border: 'border-slate-500/40',
     headerBadge: 'bg-slate-500 text-white',
     ringColor: 'ring-slate-500',
+    dotColor: 'bg-slate-500',
+    label: 'رمادي',
   },
-] as const;
+  rose: {
+    color: 'from-rose-500 to-pink-600',
+    lightBg: 'bg-rose-500/10 dark:bg-rose-500/15',
+    border: 'border-rose-500/40',
+    headerBadge: 'bg-rose-500 text-white',
+    ringColor: 'ring-rose-500',
+    dotColor: 'bg-rose-500',
+    label: 'وردي',
+  },
+  purple: {
+    color: 'from-purple-500 to-violet-600',
+    lightBg: 'bg-purple-500/10 dark:bg-purple-500/15',
+    border: 'border-purple-500/40',
+    headerBadge: 'bg-purple-500 text-white',
+    ringColor: 'ring-purple-500',
+    dotColor: 'bg-purple-500',
+    label: 'أرجواني',
+  },
+  teal: {
+    color: 'from-teal-500 to-cyan-600',
+    lightBg: 'bg-teal-500/10 dark:bg-teal-500/15',
+    border: 'border-teal-500/40',
+    headerBadge: 'bg-teal-500 text-white',
+    ringColor: 'ring-teal-500',
+    dotColor: 'bg-teal-500',
+    label: 'فيروزي',
+  },
+  orange: {
+    color: 'from-orange-500 to-amber-600',
+    lightBg: 'bg-orange-500/10 dark:bg-orange-500/15',
+    border: 'border-orange-500/40',
+    headerBadge: 'bg-orange-500 text-white',
+    ringColor: 'ring-orange-500',
+    dotColor: 'bg-orange-500',
+    label: 'برتقالي',
+  },
+};
 
-type StageId = (typeof STAGES_CONFIG)[number]['id'];
+// الأيقونات المتاحة للاختيار
+export const AVAILABLE_ICONS: Record<string, React.ElementType> = {
+  Sparkles,
+  Package,
+  Layers,
+  Boxes,
+  CheckCircle2,
+  Scissors,
+  Truck,
+  Palette,
+  Clock,
+  Printer,
+  Wrench,
+  Tag,
+  Star,
+  FileText,
+};
+
+// المراحل الافتراضية كـ Fallback قبل اكتمال التحميل
+const DEFAULT_FALLBACK_STAGES: KanbanColumnItem[] = [
+  { id: 1, key: 'in_design', title: 'في التصميم', color: 'sky', icon: 'Sparkles', sort_order: 1, is_initial: true, is_final: false },
+  { id: 2, key: 'in_printing', title: 'في الطباعة', color: 'indigo', icon: 'Package', sort_order: 2, is_initial: false, is_final: false },
+  { id: 3, key: 'in_finishing', title: 'في التشطيب', color: 'amber', icon: 'Layers', sort_order: 3, is_initial: false, is_final: false },
+  { id: 4, key: 'in_office', title: 'في المكتب (جاهز)', color: 'emerald', icon: 'Boxes', sort_order: 4, is_initial: false, is_final: false },
+  { id: 5, key: 'delivered', title: 'تم التسليم', color: 'slate', icon: 'CheckCircle2', sort_order: 5, is_initial: false, is_final: true },
+];
 
 export default function KanbanPage() {
   const queryClient = useQueryClient();
@@ -105,11 +184,26 @@ export default function KanbanPage() {
 
   // Drag and Drop State
   const [draggedCard, setDraggedCard] = useState<KanbanCardItem | null>(null);
-  const [dragOverColumn, setDragOverColumn] = useState<StageId | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
 
-  // مودال خيار التسليم السريع عند السحب إلى "تم التسليم"
+  // مودال خيار التسليم السريع عند السحب إلى مرحلة نهائية
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
   const [pendingDeliveryCard, setPendingDeliveryCard] = useState<KanbanCardItem | null>(null);
+
+  // إدارة المراحل والأعمدة (Dynamic Stages Manager)
+  const [manageColumnsOpen, setManageColumnsOpen] = useState(false);
+  const [columnFormOpen, setColumnFormOpen] = useState(false);
+  const [editingColumn, setEditingColumn] = useState<KanbanColumnItem | null>(null);
+  const [formTitle, setFormTitle] = useState('');
+  const [formColor, setFormColor] = useState('sky');
+  const [formIcon, setFormIcon] = useState('Layers');
+  const [formIsInitial, setFormIsInitial] = useState(false);
+  const [formIsFinal, setFormIsFinal] = useState(false);
+
+  // تأكيد حذف مرحلة مع خيار النقل البديل
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [columnToDelete, setColumnToDelete] = useState<KanbanColumnItem | null>(null);
+  const [fallbackStageKey, setFallbackStageKey] = useState('');
 
   // جلب بيانات اللوحة
   const { data, isLoading, refetch, isFetching } = useQuery<KanbanBoardResponse>({
@@ -123,6 +217,14 @@ export default function KanbanPage() {
       return res.data;
     },
   });
+
+  // قائمة الأعمدة النشطة (من السيرفر أو الافتراضية)
+  const activeColumns = useMemo<KanbanColumnItem[]>(() => {
+    if (data?.columns_config && data.columns_config.length > 0) {
+      return data.columns_config;
+    }
+    return DEFAULT_FALLBACK_STAGES;
+  }, [data?.columns_config]);
 
   // تحديث حالة الكرت
   const updateCardMutation = useMutation({
@@ -173,101 +275,235 @@ export default function KanbanPage() {
     },
   });
 
+  // طفرة إنشاء أو تحديث مرحلة
+  const saveColumnMutation = useMutation({
+    mutationFn: async () => {
+      if (!formTitle.trim()) {
+        throw new Error('يرجى إدخال اسم المرحلة');
+      }
+
+      if (editingColumn) {
+        const res = await kanbanApi.updateColumn(editingColumn.id, {
+          title: formTitle.trim(),
+          color: formColor,
+          icon: formIcon,
+          is_initial: formIsInitial,
+          is_final: formIsFinal,
+        });
+        return res.data;
+      } else {
+        const res = await kanbanApi.createColumn({
+          title: formTitle.trim(),
+          color: formColor,
+          icon: formIcon,
+          is_initial: formIsInitial,
+          is_final: formIsFinal,
+        });
+        return res.data;
+      }
+    },
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['kanban'] });
+      toast.success(res.message || 'تم حفظ المرحلة بنجاح');
+      setColumnFormOpen(false);
+      setEditingColumn(null);
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || err.message || 'فشل حفظ المرحلة');
+    },
+  });
+
+  // طفرة حذف مرحلة
+  const deleteColumnMutation = useMutation({
+    mutationFn: async () => {
+      if (!columnToDelete) return;
+      const res = await kanbanApi.deleteColumn(columnToDelete.id, fallbackStageKey || undefined);
+      return res.data;
+    },
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['kanban'] });
+      toast.success(res?.message || 'تم حذف المرحلة بنجاح');
+      setDeleteModalOpen(false);
+      setColumnToDelete(null);
+      setFallbackStageKey('');
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'فشل حذف المرحلة');
+    },
+  });
+
+  // طفرة إعادة ترتيب المراحل
+  const reorderColumnsMutation = useMutation({
+    mutationFn: async (columnIds: number[]) => {
+      const res = await kanbanApi.reorderColumns(columnIds);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['kanban'] });
+      toast.success('تم حفظ ترتيب المراحل');
+    },
+    onError: () => {
+      toast.error('فشل حفظ ترتيب المراحل');
+    },
+  });
+
   // معالجة بدء السحب
   const handleDragStart = (card: KanbanCardItem) => {
     setDraggedCard(card);
   };
 
   // معالجة السحب فوق العمود
-  const handleDragOver = (e: React.DragEvent, stageId: StageId) => {
+  const handleDragOver = (e: React.DragEvent, stageKey: string) => {
     e.preventDefault();
-    if (dragOverColumn !== stageId) {
-      setDragOverColumn(stageId);
+    if (dragOverColumn !== stageKey) {
+      setDragOverColumn(stageKey);
     }
   };
 
-  const handleDragLeave = (e: React.DragEvent, stageId: StageId) => {
+  const handleDragLeave = (e: React.DragEvent, stageKey: string) => {
     e.preventDefault();
-    if (dragOverColumn === stageId) {
+    if (dragOverColumn === stageKey) {
       setDragOverColumn(null);
     }
   };
 
   // معالجة الإفلات (Drop)
-  const handleDrop = (e: React.DragEvent, targetStage: StageId) => {
+  const handleDrop = (e: React.DragEvent, targetStageKey: string) => {
     e.preventDefault();
     setDragOverColumn(null);
 
-    if (!draggedCard || draggedCard.status === targetStage) {
+    if (!draggedCard) return;
+    if (draggedCard.status === targetStageKey) {
       setDraggedCard(null);
       return;
     }
 
-    // إذا تم الإفلات في "تم التسليم" وكان للفاتورة أكثر من بند أو بنود أخرى غير مسلّمة
-    if (targetStage === 'delivered') {
-      const stats = draggedCard.completion_stats;
-      if (stats && stats.total_items > 1 && !stats.is_all_delivered) {
-        setPendingDeliveryCard(draggedCard);
-        setDeliveryModalOpen(true);
-        setDraggedCard(null);
-        return;
-      }
+    const targetCol = activeColumns.find((c) => c.key === targetStageKey);
+    const isTargetFinal = targetCol ? targetCol.is_final : targetStageKey === 'delivered';
+
+    // فحص إذا كانت المرحلة نهائية وتوجد بنود أخرى بالفاتورة
+    if (
+      isTargetFinal &&
+      draggedCard.completion_stats?.total_items > 1 &&
+      !draggedCard.completion_stats?.is_all_delivered
+    ) {
+      setPendingDeliveryCard(draggedCard);
+      setDeliveryModalOpen(true);
+      setDraggedCard(null);
+      return;
     }
 
-    // النقل العادي المباشر
     updateCardMutation.mutate({
       cardId: draggedCard.id,
-      status: targetStage,
+      status: targetStageKey,
     });
+
     setDraggedCard(null);
   };
 
-  // تأكيد تسليم هذا البند فقط من المودال
+  // تأكيد تسليم بند واحد فقط
   const confirmDeliverSingle = () => {
     if (!pendingDeliveryCard) return;
+    const finalCol = activeColumns.find((c) => c.is_final);
+    const finalKey = finalCol ? finalCol.key : 'delivered';
+
     updateCardMutation.mutate({
       cardId: pendingDeliveryCard.id,
-      status: 'delivered',
+      status: finalKey,
     });
     setDeliveryModalOpen(false);
     setPendingDeliveryCard(null);
   };
 
-  // تأكيد تسليم كامل بنود الفاتورة
+  // تأكيد تسليم كامل بنود الفاتورة معاً
   const confirmDeliverAll = () => {
     if (!pendingDeliveryCard) return;
     batchDeliverMutation.mutate(pendingDeliveryCard.invoice_id);
   };
 
-  const counts = data?.counts || {
-    in_design: 0,
-    in_printing: 0,
-    in_finishing: 0,
-    in_office: 0,
-    delivered: 0,
-    total: 0,
-    overdue: 0,
+  // فتح نافذة إنشاء مرحلة جديدة
+  const openCreateColumnDialog = () => {
+    setEditingColumn(null);
+    setFormTitle('');
+    setFormColor('sky');
+    setFormIcon('Layers');
+    setFormIsInitial(false);
+    setFormIsFinal(false);
+    setColumnFormOpen(true);
   };
 
+  // فتح نافذة تعديل مرحلة
+  const openEditColumnDialog = (col: KanbanColumnItem) => {
+    setEditingColumn(col);
+    setFormTitle(col.title);
+    setFormColor(col.color || 'sky');
+    setFormIcon(col.icon || 'Layers');
+    setFormIsInitial(col.is_initial);
+    setFormIsFinal(col.is_final);
+    setColumnFormOpen(true);
+  };
+
+  // فتح نافذة تأكيد حذف مرحلة
+  const openDeleteColumnDialog = (col: KanbanColumnItem) => {
+    if (activeColumns.length <= 1) {
+      toast.error('لا يمكن حذف آخر مرحلة متبقية في اللوحة');
+      return;
+    }
+    setColumnToDelete(col);
+    // اقتراح أول مرحلة بديلة
+    const fallback = activeColumns.find((c) => c.id !== col.id);
+    setFallbackStageKey(fallback?.key || '');
+    setDeleteModalOpen(true);
+  };
+
+  // تحريك مرحلة لأعلى أو لأسفل في الترتيب
+  const moveColumnOrder = (index: number, direction: 'up' | 'down') => {
+    const newColumns = [...activeColumns];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newColumns.length) return;
+
+    const [moved] = newColumns.splice(index, 1);
+    newColumns.splice(targetIndex, 0, moved);
+
+    const ids = newColumns.map((c) => c.id);
+    reorderColumnsMutation.mutate(ids);
+  };
+
+  const counts = data?.counts || { total: 0, overdue: 0 };
+
   return (
-    <div className="flex flex-col gap-6">
-      {/* رأس الصفحة والمؤشرات */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-md shadow-primary/20">
-              <Kanban className="h-6 w-6" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">لوحة متابعة الإنتاج (Kanban)</h1>
-              <p className="text-sm text-muted-foreground">
-                تفكيك بنود الفواتير وتتبع مراحل التصميم والطباعة والتشطيب والتسليم
-              </p>
-            </div>
+    <div className="space-y-6">
+      {/* ترويسة الصفحة والأزرار التفاعلية */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-2xl bg-gradient-to-br from-primary to-indigo-600 text-white shadow-lg shadow-primary/20">
+            <Kanban className="h-7 w-7" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-2">
+              <span>لوحة كانبان - متابعة الإنتاج</span>
+              <Badge variant="outline" className="text-xs font-semibold px-2 py-0.5 rounded-full border-primary/30 text-primary">
+                {counts.total} بنود
+              </Badge>
+            </h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              متابعة كل بند بالاسم ومرحلة الإنتاج بدقة، مع إمكانية تخصيص مراحل وأعمدة اللوحة بالكامل.
+            </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {/* زر إدارة المراحل والأعمدة */}
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => setManageColumnsOpen(true)}
+            className="gap-2 shadow-sm font-semibold bg-gradient-to-r from-primary to-indigo-600 hover:from-primary/95 hover:to-indigo-600/95 text-white"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            <span>إدارة المراحل والأعمدة</span>
+          </Button>
+
           {/* زر مزامنة الكروت السابقة */}
           <Button
             variant="outline"
@@ -278,7 +514,7 @@ export default function KanbanPage() {
             title="توليد كروت لأي فواتير قديمة لا تملك كروت كانبان"
           >
             <Layers className="h-4 w-4 text-primary" />
-            <span>مزامنة الفواتير السابقة</span>
+            <span>مزامنة الفواتير</span>
           </Button>
 
           {/* زر التحديث السريع */}
@@ -295,20 +531,22 @@ export default function KanbanPage() {
         </div>
       </div>
 
-      {/* شريط الإحصائيات السريعة */}
+      {/* شريط الإحصائيات السريعة للمراحل الديناميكية */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {STAGES_CONFIG.map((stage) => {
-          const Icon = stage.icon;
-          const count = counts[stage.id] ?? 0;
+        {activeColumns.map((col) => {
+          const scheme = STAGE_COLORS[col.color] || STAGE_COLORS.sky;
+          const Icon = AVAILABLE_ICONS[col.icon] || Layers;
+          const count = counts[col.key] ?? 0;
+
           return (
             <motion.div
-              key={stage.id}
+              key={col.key}
               whileHover={{ y: -2 }}
               className="p-3.5 rounded-2xl border bg-card/60 backdrop-blur shadow-sm hover:shadow-md transition-all"
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground">{stage.title}</span>
-                <div className={`p-1.5 rounded-lg ${stage.lightBg}`}>
+                <span className="text-xs font-medium text-muted-foreground truncate">{col.title}</span>
+                <div className={`p-1.5 rounded-lg ${scheme.lightBg}`}>
                   <Icon className="h-4 w-4 text-foreground" />
                 </div>
               </div>
@@ -363,71 +601,65 @@ export default function KanbanPage() {
           </select>
         </div>
 
-        {/* فلترة تاريخ التسليم ومستوى الاستعجال */}
-        <div className="w-full md:w-52">
+        {/* فلترة مستوى الاستعجال وتاريخ التسليم */}
+        <div className="w-full md:w-56">
           <select
             value={selectedUrgency}
             onChange={(e) => setSelectedUrgency(e.target.value)}
             className="w-full h-10 px-3 text-sm rounded-xl border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary"
           >
-            <option value="all">كل المواعيد</option>
-            <option value="overdue">🔴 متأخرة عن التسليم</option>
-            <option value="today">🟠 موعد التسليم اليوم</option>
-            <option value="tomorrow">🟡 موعد التسليم غداً</option>
-            <option value="upcoming">🟢 مواعيد قادمة</option>
+            <option value="all">كل مواعيد التسليم</option>
+            <option value="overdue">متأخرة عن موعدها</option>
+            <option value="today">موعد تسليمها اليوم</option>
+            <option value="tomorrow">موعد تسليمها غداً</option>
+            <option value="upcoming">قادمة (اليوم فما بعد)</option>
           </select>
         </div>
-
-        {(search || selectedCustomer !== 'all' || selectedUrgency !== 'all') && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setSearch('');
-              setSelectedCustomer('all');
-              setSelectedUrgency('all');
-            }}
-            className="text-xs text-muted-foreground hover:text-foreground"
-          >
-            إعادة تعيين الفلاتر
-          </Button>
-        )}
       </div>
 
-      {/* لوحة الأعمدة الـ 5 للكانبان */}
+      {/* لوحة الكانبان الرئيسية - الأعمدة الديناميكية */}
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
+        <div className="h-96 flex flex-col items-center justify-center gap-3 border-2 border-dashed rounded-3xl bg-card/20">
           <RefreshCw className="h-8 w-8 animate-spin text-primary" />
           <p className="text-sm font-medium text-muted-foreground">جارٍ تحميل لوحة الكانبان...</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 items-start">
-          {STAGES_CONFIG.map((stage) => {
-            const Icon = stage.icon;
-            const cards = data?.columns?.[stage.id] || [];
-            const isColumnOver = dragOverColumn === stage.id;
+        <div className="flex gap-4 overflow-x-auto pb-4 items-start scrollbar-thin">
+          {activeColumns.map((col) => {
+            const scheme = STAGE_COLORS[col.color] || STAGE_COLORS.sky;
+            const Icon = AVAILABLE_ICONS[col.icon] || Layers;
+            const cards = data?.columns?.[col.key] || [];
+            const isColumnOver = dragOverColumn === col.key;
 
             return (
               <div
-                key={stage.id}
-                onDragOver={(e) => handleDragOver(e, stage.id)}
-                onDragLeave={(e) => handleDragLeave(e, stage.id)}
-                onDrop={(e) => handleDrop(e, stage.id)}
-                className={`flex flex-col rounded-2xl border transition-all duration-200 bg-muted/30 backdrop-blur min-h-[550px] ${
+                key={col.key}
+                onDragOver={(e) => handleDragOver(e, col.key)}
+                onDragLeave={(e) => handleDragLeave(e, col.key)}
+                onDrop={(e) => handleDrop(e, col.key)}
+                className={`flex flex-col rounded-2xl border transition-all duration-200 bg-muted/30 backdrop-blur min-h-[550px] w-[300px] sm:w-[320px] flex-shrink-0 ${
                   isColumnOver
-                    ? `border-primary ring-2 ring-primary/30 shadow-lg ${stage.lightBg}`
+                    ? `border-primary ring-2 ring-primary/30 shadow-lg ${scheme.lightBg}`
                     : 'border-border/80'
                 }`}
               >
                 {/* ترويسة العمود */}
-                <div className="p-3.5 border-b border-border/80 flex items-center justify-between sticky top-0 bg-card/80 backdrop-blur-md rounded-t-2xl z-10">
-                  <div className="flex items-center gap-2">
-                    <div className={`p-1.5 rounded-lg ${stage.lightBg}`}>
+                <div className="p-3.5 border-b border-border/80 flex items-center justify-between sticky top-0 bg-card/90 backdrop-blur-md rounded-t-2xl z-10">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <div className={`p-1.5 rounded-lg ${scheme.lightBg} flex-shrink-0`}>
                       <Icon className="h-4 w-4" />
                     </div>
-                    <h3 className="font-bold text-sm tracking-tight">{stage.title}</h3>
+                    <div className="truncate">
+                      <h3 className="font-bold text-sm tracking-tight truncate">{col.title}</h3>
+                      {col.is_initial && (
+                        <span className="text-[10px] text-muted-foreground block -mt-0.5">البداية</span>
+                      )}
+                      {col.is_final && (
+                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold block -mt-0.5">تسليم نهائي</span>
+                      )}
+                    </div>
                   </div>
-                  <Badge variant="secondary" className="font-bold text-xs px-2 py-0.5 rounded-full">
+                  <Badge variant="secondary" className="font-bold text-xs px-2 py-0.5 rounded-full flex-shrink-0">
                     {cards.length}
                   </Badge>
                 </div>
@@ -444,9 +676,17 @@ export default function KanbanPage() {
                       <KanbanCardItemComponent
                         key={card.id}
                         card={card}
+                        allColumns={activeColumns}
                         onDragStart={() => handleDragStart(card)}
                         onQuickMove={(newStatus) => {
-                          if (newStatus === 'delivered' && card.completion_stats?.total_items > 1 && !card.completion_stats?.is_all_delivered) {
+                          const targetCol = activeColumns.find((c) => c.key === newStatus);
+                          const isTargetFinal = targetCol ? targetCol.is_final : newStatus === 'delivered';
+
+                          if (
+                            isTargetFinal &&
+                            card.completion_stats?.total_items > 1 &&
+                            !card.completion_stats?.is_all_delivered
+                          ) {
                             setPendingDeliveryCard(card);
                             setDeliveryModalOpen(true);
                           } else {
@@ -460,8 +700,338 @@ export default function KanbanPage() {
               </div>
             );
           })}
+
+          {/* كرت سريع لإضافة مرحلة جديدة في نهاية اللوحة */}
+          <button
+            type="button"
+            onClick={openCreateColumnDialog}
+            className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border/70 hover:border-primary/60 bg-muted/20 hover:bg-muted/40 transition-all min-h-[550px] w-[260px] flex-shrink-0 p-6 text-center group cursor-pointer"
+          >
+            <div className="p-3 rounded-full bg-primary/10 text-primary group-hover:scale-110 transition-transform mb-2">
+              <Plus className="h-6 w-6" />
+            </div>
+            <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">
+              + إضافة مرحلة جديدة
+            </span>
+            <span className="text-xs text-muted-foreground mt-1 max-w-[180px]">
+              يمكنك إضافة عمود مخصص لأي مرحلة في خط الإنتاج
+            </span>
+          </button>
         </div>
       )}
+
+      {/* نافذة إدارة المراحل والأعمدة (Manage Stages Dialog) */}
+      <Dialog open={manageColumnsOpen} onOpenChange={setManageColumnsOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-lg font-bold flex items-center gap-2">
+                <SlidersHorizontal className="h-5 w-5 text-primary" />
+                <span>إدارة مراحل وأعمدة الكانبان</span>
+              </DialogTitle>
+              <Button
+                size="sm"
+                onClick={openCreateColumnDialog}
+                className="gap-1.5 text-xs font-semibold"
+              >
+                <Plus className="h-4 w-4" />
+                <span>إضافة مرحلة جديدة</span>
+              </Button>
+            </div>
+            <DialogDescription className="text-xs text-muted-foreground">
+              يمكنك هنا إضافة أو حذف أو تعديل أي مرحلة من مراحل لوحة الإنتاج وإعادة ترتيبها حسب تدفق العمل لديك.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* قائمة المراحل الحالية */}
+          <div className="flex-1 overflow-y-auto space-y-2.5 py-3 pr-1">
+            {activeColumns.map((col, index) => {
+              const scheme = STAGE_COLORS[col.color] || STAGE_COLORS.sky;
+              const Icon = AVAILABLE_ICONS[col.icon] || Layers;
+              const cardsCount = counts[col.key] ?? 0;
+
+              return (
+                <div
+                  key={col.id}
+                  className="p-3 rounded-xl border bg-card flex items-center justify-between gap-3 hover:border-primary/30 transition-all shadow-sm"
+                >
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <div className="flex flex-col gap-0.5">
+                      <button
+                        type="button"
+                        onClick={() => moveColumnOrder(index, 'up')}
+                        disabled={index === 0 || reorderColumnsMutation.isPending}
+                        className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                        title="تحريك للأمام"
+                      >
+                        <ArrowUp className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveColumnOrder(index, 'down')}
+                        disabled={index === activeColumns.length - 1 || reorderColumnsMutation.isPending}
+                        className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                        title="تحريك للخلف"
+                      >
+                        <ArrowDown className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+
+                    <div className={`p-2 rounded-lg ${scheme.lightBg} flex-shrink-0`}>
+                      <Icon className="h-4 w-4" />
+                    </div>
+
+                    <div className="truncate">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-foreground">{col.title}</span>
+                        <code className="text-[10px] text-muted-foreground font-mono bg-muted px-1.5 py-0.5 rounded">
+                          {col.key}
+                        </code>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="text-[11px] text-muted-foreground">
+                          {cardsCount} بند حالياً
+                        </span>
+                        {col.is_initial && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-sky-500/10 text-sky-600 border-sky-500/30">
+                            مرحلة أولية افتراضية
+                          </Badge>
+                        )}
+                        {col.is_final && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
+                            مرحلة تسليم نهائي
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-primary"
+                      onClick={() => openEditColumnDialog(col)}
+                      title="تعديل المرحلة"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={() => openDeleteColumnDialog(col)}
+                      disabled={activeColumns.length <= 1}
+                      title="حذف المرحلة"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <DialogFooter className="border-t pt-3 flex justify-between items-center sm:justify-between">
+            <span className="text-xs text-muted-foreground">
+              إجمالي المراحل المعتمدة: {activeColumns.length}
+            </span>
+            <Button variant="outline" size="sm" onClick={() => setManageColumnsOpen(false)}>
+              إغلاق
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* نافذة إضافة أو تعديل مرحلة (Create / Edit Column Dialog) */}
+      <Dialog open={columnFormOpen} onOpenChange={setColumnFormOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span>{editingColumn ? 'تعديل المرحلة' : 'إضافة مرحلة جديدة'}</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              حدد اسم المرحلة ومظهرها وخصائصها في تدفق العمل
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* اسم المرحلة */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">عنوان المرحلة *</Label>
+              <Input
+                value={formTitle}
+                onChange={(e) => setFormTitle(e.target.value)}
+                placeholder="مثال: مراجعة العميل، قص وسلوفان، في التوصيل..."
+                className="text-sm"
+                autoFocus
+              />
+            </div>
+
+            {/* اختيار اللون */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">لون المرحلة</Label>
+              <div className="grid grid-cols-5 gap-2">
+                {Object.entries(STAGE_COLORS).map(([colorKey, scheme]) => (
+                  <button
+                    key={colorKey}
+                    type="button"
+                    onClick={() => setFormColor(colorKey)}
+                    className={`flex items-center gap-1.5 p-2 rounded-xl border text-xs font-medium transition-all ${
+                      formColor === colorKey
+                        ? 'border-primary ring-2 ring-primary/30 bg-primary/10'
+                        : 'border-border hover:bg-muted/40'
+                    }`}
+                  >
+                    <span className={`h-3 w-3 rounded-full ${scheme.dotColor}`} />
+                    <span className="text-[11px] truncate">{scheme.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* اختيار الأيقونة */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">أيقونة المرحلة</Label>
+              <div className="grid grid-cols-7 gap-2 max-h-36 overflow-y-auto p-1 border rounded-xl bg-muted/20">
+                {Object.entries(AVAILABLE_ICONS).map(([iconKey, IconComponent]) => (
+                  <button
+                    key={iconKey}
+                    type="button"
+                    onClick={() => setFormIcon(iconKey)}
+                    className={`p-2.5 rounded-lg border flex items-center justify-center transition-all ${
+                      formIcon === iconKey
+                        ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+                        : 'border-transparent hover:bg-muted text-muted-foreground hover:text-foreground'
+                    }`}
+                    title={iconKey}
+                  >
+                    <IconComponent className="h-4 w-4" />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* خيارات الحالة والخصائص */}
+            <div className="space-y-2 pt-2 border-t">
+              <label className="flex items-start gap-2.5 p-2.5 rounded-xl border bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors">
+                <input
+                  type="checkbox"
+                  checked={formIsInitial}
+                  onChange={(e) => setFormIsInitial(e.target.checked)}
+                  className="mt-0.5 rounded text-primary focus:ring-primary"
+                />
+                <div className="text-xs">
+                  <span className="font-semibold block text-foreground">مرحلة البداية الافتراضية للبنود الجديدة</span>
+                  <span className="text-muted-foreground text-[11px]">
+                    عند إنشاء أي فاتورة جديدة، ستدخل بنودها تلقائياً في هذه المرحلة.
+                  </span>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-2.5 p-2.5 rounded-xl border bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors">
+                <input
+                  type="checkbox"
+                  checked={formIsFinal}
+                  onChange={(e) => setFormIsFinal(e.target.checked)}
+                  className="mt-0.5 rounded text-primary focus:ring-primary"
+                />
+                <div className="text-xs">
+                  <span className="font-semibold block text-foreground">مرحلة تسليم نهائي</span>
+                  <span className="text-muted-foreground text-[11px]">
+                    عند نقل البنود إليها يتم تسجيل تاريخ ووقت التسليم واكتمال الفاتورة تلقائياً.
+                  </span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setColumnFormOpen(false)}>
+              إلغاء
+            </Button>
+            <Button
+              onClick={() => saveColumnMutation.mutate()}
+              disabled={saveColumnMutation.isPending || !formTitle.trim()}
+              className="gap-1.5"
+            >
+              {saveColumnMutation.isPending ? 'جارٍ الحفظ...' : editingColumn ? 'تحديث المرحلة' : 'إنشاء المرحلة'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* نافذة تأكيد حذف مرحلة ونقل الكروت (Delete Column & Migrate Cards Dialog) */}
+      <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <div className="p-3 w-fit rounded-2xl bg-destructive/10 text-destructive mb-2">
+              <Trash2 className="h-6 w-6" />
+            </div>
+            <DialogTitle className="text-base font-bold text-destructive">
+              حذف المرحلة "{columnToDelete?.title}"
+            </DialogTitle>
+            <DialogDescription className="text-xs space-y-2">
+              <span>هل أنت متأكد من إزالة هذا العمود من لوحة الكانبان؟</span>
+            </DialogDescription>
+          </DialogHeader>
+
+          {columnToDelete && (
+            <div className="space-y-3 py-2">
+              {/* في حال وجود كروت في هذه المرحلة */}
+              {(counts[columnToDelete.key] || 0) > 0 ? (
+                <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200 text-xs space-y-2">
+                  <div className="flex items-center gap-1.5 font-bold">
+                    <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                    <span>تنبيه: يوجد ({counts[columnToDelete.key]}) بنود في هذه المرحلة!</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed">
+                    لحماية بياناتك، يرجى اختيار المرحلة البديلة التي ترغب بنقل هذه البنود إليها قبل إتمام الحذف:
+                  </p>
+                  <div className="pt-1">
+                    <Label className="text-[11px] font-semibold text-foreground mb-1 block">
+                      المرحلة البديلة لنقل البنود:
+                    </Label>
+                    <select
+                      value={fallbackStageKey}
+                      onChange={(e) => setFallbackStageKey(e.target.value)}
+                      className="w-full h-9 px-3 text-xs rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      {activeColumns
+                        .filter((c) => c.id !== columnToDelete.id)
+                        .map((c) => (
+                          <option key={c.key} value={c.key}>
+                            {c.title}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl border bg-muted/40 text-xs text-muted-foreground flex items-center gap-2">
+                  <Info className="h-4 w-4 flex-shrink-0 text-primary" />
+                  <span>هذه المرحلة فارغة حالياً ولا تحتوي على أي بنود عمل.</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setDeleteModalOpen(false)}>
+              إلغاء
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteColumnMutation.mutate()}
+              disabled={deleteColumnMutation.isPending}
+              className="gap-1.5"
+            >
+              {deleteColumnMutation.isPending ? 'جارٍ الحذف...' : 'تأكيد الحذف'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* مودال خيار التسليم السريع لبنود الفاتورة */}
       <Dialog open={deliveryModalOpen} onOpenChange={setDeliveryModalOpen}>
@@ -474,7 +1044,7 @@ export default function KanbanPage() {
             <DialogDescription className="text-sm">
               أنت تقوم الآن بنقل البند{' '}
               <strong className="text-foreground font-bold">"{pendingDeliveryCard?.item_name}"</strong> إلى مرحلة{' '}
-              <span className="text-emerald-600 font-semibold">تم التسليم</span>.
+              <span className="text-emerald-600 font-semibold">التسليم النهائي</span>.
             </DialogDescription>
           </DialogHeader>
 
@@ -525,12 +1095,14 @@ export default function KanbanPage() {
 // مكون كرت الكانبان المستقل
 function KanbanCardItemComponent({
   card,
+  allColumns,
   onDragStart,
   onQuickMove,
 }: {
   card: KanbanCardItem;
+  allColumns: KanbanColumnItem[];
   onDragStart: () => void;
-  onQuickMove: (newStatus: StageId) => void;
+  onQuickMove: (newStatus: string) => void;
 }) {
   const stats = card.completion_stats;
 
@@ -635,7 +1207,7 @@ function KanbanCardItemComponent({
         <span className="truncate font-medium">{card.customer_name}</span>
       </div>
 
-      {/* تاريخ التسليم ومستوى الاستعجال - مهم جداً */}
+      {/* تاريخ التسليم ومستوى الاستعجال */}
       <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/60">
         <span className="text-[10px] text-muted-foreground/80">موعد التسليم:</span>
         {getDeliveryDateBadge()}
@@ -660,7 +1232,7 @@ function KanbanCardItemComponent({
         </div>
       )}
 
-      {/* زر النقل السريع من القائمة المنسدلة (لتسهيل الاستخدام على الموبايل وبديل السحب) */}
+      {/* زر النقل السريع من القائمة المنسدلة لجميع المراحل المتاحة */}
       <div className="mt-2 flex justify-end">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -673,16 +1245,16 @@ function KanbanCardItemComponent({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="text-xs">
-            {STAGES_CONFIG.filter((s) => s.id !== card.status).map((stage) => {
-              const StageIcon = stage.icon;
+            {allColumns.filter((s) => s.key !== card.status).map((col) => {
+              const StageIcon = AVAILABLE_ICONS[col.icon] || Layers;
               return (
                 <DropdownMenuItem
-                  key={stage.id}
-                  onClick={() => onQuickMove(stage.id)}
+                  key={col.key}
+                  onClick={() => onQuickMove(col.key)}
                   className="gap-2 cursor-pointer"
                 >
                   <StageIcon className="h-3.5 w-3.5" />
-                  <span>{stage.title}</span>
+                  <span>{col.title}</span>
                 </DropdownMenuItem>
               );
             })}
