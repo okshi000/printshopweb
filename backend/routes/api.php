@@ -64,11 +64,12 @@ Route::middleware(['auth:sanctum', 'api.permission'])->group(function () {
         Route::patch('/cards/{card}', [KanbanController::class, 'updateCard']);
         Route::post('/invoices/{invoice}/batch-deliver', [KanbanController::class, 'batchDeliver']);
         Route::post('/sync', [KanbanController::class, 'syncMissing']);
+        // Column management routes - الثابتة أولاً قبل المتغيرة
         Route::get('/columns', [KanbanController::class, 'getColumns']);
         Route::post('/columns', [KanbanController::class, 'storeColumn']);
+        Route::post('/columns/reorder', [KanbanController::class, 'reorderColumns']);
         Route::put('/columns/{column}', [KanbanController::class, 'updateColumn']);
         Route::delete('/columns/{column}', [KanbanController::class, 'destroyColumn']);
-        Route::post('/columns/reorder', [KanbanController::class, 'reorderColumns']);
     });
 
     // Expenses
