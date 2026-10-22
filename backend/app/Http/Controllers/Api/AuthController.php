@@ -15,14 +15,28 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
+            'login' => 'nullable|string',
+            'email' => 'nullable|string',
+            'username' => 'nullable|string',
+            'password' => 'required|string',
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        $loginInput = trim($request->input('login') ?? $request->input('email') ?? $request->input('username') ?? '');
+
+        if (empty($loginInput)) {
+            throw ValidationException::withMessages([
+                'login' => ['يرجى إدخال اسم المستخدم أو البريد الإلكتروني.'],
+                'email' => ['يرجى إدخال اسم المستخدم أو البريد الإلكتروني.'],
+            ]);
+        }
+
+        $user = User::where('email', $loginInput)
+            ->orWhere('name', $loginInput)
+            ->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             throw ValidationException::withMessages([
+                'login' => ['بيانات الدخول غير صحيحة.'],
                 'email' => ['بيانات الدخول غير صحيحة.'],
             ]);
         }

@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { motion } from 'framer-motion';
-import { AlertCircle, Printer, Eye, EyeOff, Lock, Mail } from 'lucide-react';
+import { AlertCircle, Printer, Eye, EyeOff, Lock, User } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAuth } from '../../contexts/AuthContext';
 
 const loginSchema = z.object({
-  email: z.string().min(1, 'البريد الإلكتروني مطلوب').email('البريد الإلكتروني غير صالح'),
+  login: z.string().min(1, 'اسم المستخدم أو البريد الإلكتروني مطلوب'),
   password: z.string().min(1, 'كلمة المرور مطلوبة'),
 });
 
@@ -33,7 +33,7 @@ export default function LoginPage() {
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: '',
+      login: '',
       password: '',
     },
   });
@@ -43,7 +43,7 @@ export default function LoginPage() {
     setError(null);
     
     try {
-      await login(values.email, values.password);
+      await login(values.login, values.password);
       navigate('/');
     } catch (err: unknown) {
       const errorMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -114,7 +114,7 @@ export default function LoginPage() {
             <CardHeader className="space-y-1 pb-4">
               <CardTitle className="text-2xl font-bold text-center">تسجيل الدخول</CardTitle>
               <CardDescription className="text-center">
-                أدخل بريدك الإلكتروني وكلمة المرور
+                أدخل اسم المستخدم أو البريد الإلكتروني وكلمة المرور
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -131,15 +131,16 @@ export default function LoginPage() {
 
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email" required>البريد الإلكتروني</Label>
+                  <Label htmlFor="login" required>اسم المستخدم أو البريد الإلكتروني</Label>
                   <div className="relative">
                     <Input
-                      id="email"
-                      type="email"
-                      placeholder="admin@printshop.com"
-                      icon={<Mail className="h-4 w-4" />}
-                      error={errors.email?.message}
-                      {...register('email')}
+                      id="login"
+                      type="text"
+                      autoComplete="username"
+                      placeholder="اسم المستخدم أو البريد الإلكتروني"
+                      icon={<User className="h-4 w-4" />}
+                      error={errors.login?.message}
+                      {...register('login')}
                     />
                   </div>
                 </div>
