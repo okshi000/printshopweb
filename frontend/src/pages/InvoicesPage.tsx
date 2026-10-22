@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus,
@@ -22,6 +22,10 @@ import {
   Archive,
   ArchiveRestore,
   Info,
+  CheckCircle2,
+  RotateCcw,
+  ChevronDown,
+  Check,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
@@ -34,6 +38,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Card,
   CardContent,
@@ -73,10 +85,28 @@ import { cn, formatCurrency, formatDate, getStatusColor, getStatusLabel, getPaym
 
 export default function InvoicesPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { hasPermission } = useAuth();
   const [page, setPage] = useState(1);
-  const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
+  
+  const currentTabParam = searchParams.get('tab');
+  const activeTab: 'active' | 'delivered' | 'archived' = 
+    currentTabParam === 'delivered' || currentTabParam === 'archived' 
+      ? currentTabParam 
+      : 'active';
+
+  const handleTabChange = (newTab: 'active' | 'delivered' | 'archived') => {
+    setSearchParams(prev => {
+      const updated = new URLSearchParams(prev);
+      updated.set('tab', newTab);
+      return updated;
+    });
+    setInvoiceStatusFilter('');
+    setPaymentStatusFilter('');
+    setPage(1);
+  };
+
   const [invoiceToArchive, setInvoiceToArchive] = useState<Invoice | null>(null);
   const [invoiceToUnarchive, setInvoiceToUnarchive] = useState<Invoice | null>(null);
   const [isActionPending, setIsActionPending] = useState(false);
@@ -111,7 +141,7 @@ export default function InvoicesPage() {
   const { data, isLoading, error } = useQuery<PaginatedResponse<Invoice>>({
     queryKey: ['invoices', page, invoiceStatusFilter, debouncedSearch, dateFrom, dateTo, sortByDeliveryDate, activeTab],
     queryFn: async () => {
-      const params: Record<string, string | number> = { page, per_page: 10 };
+      const params: Record<string, string | number> = { page, per_page: 10, tab: activeTab };
       if (activeTab === 'archived') {
         params.archived = 'true';
       }
@@ -125,6 +155,28 @@ export default function InvoicesPage() {
       }
       const res = await invoicesApi.list(params);
       return res.data;
+    },
+  });
+
+  // Fast status update mutation
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      const res = await invoicesApi.updateStatus(id, status);
+      return { id, status, data: res.data };
+    },
+    onSuccess: (_, { status }) => {
+      if (status === 'delivered') {
+        toast.success('تم تسليم الفاتورة ونقلها لقسم "تم التسليم" بنجاح');
+      } else {
+        toast.success(`تم تغيير حالة الفاتورة إلى "${getStatusLabel(status)}" بنجاح`);
+      }
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices-statistics-tab-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['kanban'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'فشل تحديث حالة الفاتورة');
     },
   });
 
@@ -220,7 +272,7 @@ export default function InvoicesPage() {
   };
 
   const buildExportParams = (targetPage: number) => {
-    const params: Record<string, string | number> = { page: targetPage, per_page: 200 };
+    const params: Record<string, string | number> = { page: targetPage, per_page: 200, tab: activeTab };
     if (activeTab === 'archived') params.archived = 'true';
     if (invoiceStatusFilter) params.status = invoiceStatusFilter;
     if (debouncedSearch) params.search = debouncedSearch;
@@ -414,16 +466,13 @@ export default function InvoicesPage() {
         </div>
       </div>
 
-      {/* Tabs for Active vs Archived Invoices */}
-      <div className="flex border-b border-border/60 gap-4">
+      {/* Tabs for Active vs Delivered vs Archived Invoices */}
+      <div className="flex border-b border-border/60 gap-2 sm:gap-4 overflow-x-auto">
         <button
           type="button"
-          onClick={() => {
-            setActiveTab('active');
-            setPage(1);
-          }}
+          onClick={() => handleTabChange('active')}
           className={cn(
-            "flex items-center gap-2 pb-3 px-3 font-medium text-sm transition-all border-b-2 -mb-px",
+            "flex items-center gap-2 pb-3 px-3 font-medium text-sm transition-all border-b-2 -mb-px whitespace-nowrap",
             activeTab === 'active'
               ? "border-primary text-primary font-semibold"
               : "border-transparent text-muted-foreground hover:text-foreground"
@@ -432,7 +481,7 @@ export default function InvoicesPage() {
           <Receipt className="h-4 w-4" />
           <span>الفواتير النشطة</span>
           {statsData?.active_invoices_count !== undefined && (
-            <Badge variant="secondary" className="mr-1 text-xs">
+            <Badge variant="secondary" className="mr-1 text-xs font-mono">
               {statsData.active_invoices_count}
             </Badge>
           )}
@@ -440,24 +489,48 @@ export default function InvoicesPage() {
 
         <button
           type="button"
-          onClick={() => {
-            setActiveTab('archived');
-            setPage(1);
-          }}
+          onClick={() => handleTabChange('delivered')}
           className={cn(
-            "flex items-center gap-2 pb-3 px-3 font-medium text-sm transition-all border-b-2 -mb-px",
+            "flex items-center gap-2 pb-3 px-3 font-medium text-sm transition-all border-b-2 -mb-px whitespace-nowrap",
+            activeTab === 'delivered'
+              ? "border-emerald-600 text-emerald-600 dark:border-emerald-500 dark:text-emerald-400 font-semibold"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+          <span>تم التسليم</span>
+          {statsData?.delivered_invoices_count !== undefined && (
+            <Badge 
+              variant="outline" 
+              className={cn(
+                "mr-1 text-xs font-mono",
+                activeTab === 'delivered'
+                  ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300"
+                  : "bg-muted text-muted-foreground"
+              )}
+            >
+              {statsData.delivered_invoices_count}
+            </Badge>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabChange('archived')}
+          className={cn(
+            "flex items-center gap-2 pb-3 px-3 font-medium text-sm transition-all border-b-2 -mb-px whitespace-nowrap",
             activeTab === 'archived'
               ? "border-amber-500 text-amber-600 dark:text-amber-400 font-semibold"
               : "border-transparent text-muted-foreground hover:text-foreground"
           )}
         >
-          <Archive className="h-4 w-4" />
+          <Archive className="h-4 w-4 text-amber-500" />
           <span>الفواتير المؤرشفة (الأرشيف)</span>
           {statsData?.archived_invoices_count !== undefined && (
             <Badge 
               variant="outline" 
               className={cn(
-                "mr-1 text-xs",
+                "mr-1 text-xs font-mono",
                 activeTab === 'archived'
                   ? "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300"
                   : "bg-muted text-muted-foreground"
@@ -468,6 +541,16 @@ export default function InvoicesPage() {
           )}
         </button>
       </div>
+
+      {activeTab === 'delivered' && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-900 dark:text-emerald-200 flex items-start gap-3">
+          <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <div className="text-sm">
+            <span className="font-semibold block mb-0.5">قسم الفواتير المسلّمة:</span>
+            يحتوي هذا القسم على جميع الفواتير التي تم تسليمها بنجاح للعملاء. الفواتير المسلّمة تظل مدرجة بالكامل في الحسابات المالية، ويمكنك متابعة تحصيل المبالغ المتبقية أو استعراض وطباعة الفاتورة في أي وقت.
+          </div>
+        </div>
+      )}
 
       {activeTab === 'archived' && (
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-800 dark:text-amber-300 flex items-start gap-3">
@@ -494,28 +577,36 @@ export default function InvoicesPage() {
             </div>
             
             <div className="flex flex-wrap gap-2">
-              <Select value={invoiceStatusFilter} onValueChange={(value) => { setInvoiceStatusFilter(value); setPage(1); }}>
-                <SelectTrigger className="w-full sm:w-[150px]">
-                  <Filter className="h-4 w-4 ml-2" />
-                  <SelectValue placeholder="حالة الفاتورة" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="new">جديدة</SelectItem>
-                  <SelectItem value="pending">قيد الانتظار</SelectItem>
-                  <SelectItem value="in_progress">قيد التنفيذ</SelectItem>
-                  <SelectItem value="ready">جاهزة</SelectItem>
-                  <SelectItem value="delivered">تم التسليم</SelectItem>
-                  <SelectItem value="completed">مكتملة</SelectItem>
-                  <SelectItem value="cancelled">ملغية</SelectItem>
-                </SelectContent>
-              </Select>
+              {activeTab === 'delivered' ? (
+                <div className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>الحالة: تم التسليم</span>
+                </div>
+              ) : (
+                <Select value={invoiceStatusFilter} onValueChange={(value) => { setInvoiceStatusFilter(value === 'all' ? '' : value); setPage(1); }}>
+                  <SelectTrigger className="w-full sm:w-[150px]">
+                    <Filter className="h-4 w-4 ml-2" />
+                    <SelectValue placeholder="حالة الفاتورة" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">كافة الحالات النشطة</SelectItem>
+                    <SelectItem value="new">جديدة</SelectItem>
+                    <SelectItem value="pending">قيد الانتظار</SelectItem>
+                    <SelectItem value="in_progress">قيد التنفيذ</SelectItem>
+                    <SelectItem value="ready">جاهزة للتسليم</SelectItem>
+                    {activeTab === 'archived' && <SelectItem value="delivered">تم التسليم</SelectItem>}
+                    <SelectItem value="cancelled">ملغية</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
 
-              <Select value={paymentStatusFilter} onValueChange={(value) => { setPaymentStatusFilter(value); setPage(1); }}>
+              <Select value={paymentStatusFilter} onValueChange={(value) => { setPaymentStatusFilter(value === 'all' ? '' : value); setPage(1); }}>
                 <SelectTrigger className="w-full sm:w-[150px]">
                   <Banknote className="h-4 w-4 ml-2" />
                   <SelectValue placeholder="حالة الدفع" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">كافة حالات الدفع</SelectItem>
                   <SelectItem value="unpaid">غير مدفوعة</SelectItem>
                   <SelectItem value="partial">مدفوعة جزئياً</SelectItem>
                   <SelectItem value="paid">مدفوعة</SelectItem>
@@ -592,15 +683,37 @@ export default function InvoicesPage() {
       <Card className="shadow-soft">
         <CardHeader className="border-b border-border/50 pb-4">
           <CardTitle className="text-lg flex items-center justify-between">
-            <span>{activeTab === 'archived' ? 'فواتير الأرشيف (مرجع بيانات)' : 'قائمة الفواتير النشطة'}</span>
+            <span>
+              {activeTab === 'archived' 
+                ? 'فواتير الأرشيف (مرجع بيانات)' 
+                : activeTab === 'delivered'
+                  ? 'فواتير تم التسليم'
+                  : 'قائمة الفواتير النشطة'}
+            </span>
             {activeTab === 'archived' && (
               <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-300">
                 مستبعدة من الحسابات المالية
               </Badge>
             )}
+            {activeTab === 'delivered' && (
+              <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 flex items-center gap-1">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                مسلّمة للعميل
+              </Badge>
+            )}
+            {activeTab === 'active' && (
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950 dark:text-blue-300">
+                قيد العمل والتنفيذ
+              </Badge>
+            )}
           </CardTitle>
           <CardDescription>
-            {data?.total || 0} {activeTab === 'archived' ? 'فاتورة مؤرشفة' : 'فاتورة نشطة'}
+            {data?.total || 0}{' '}
+            {activeTab === 'archived' 
+              ? 'فاتورة مؤرشفة' 
+              : activeTab === 'delivered'
+                ? 'فاتورة تم تسليمها بنجاح للعميل'
+                : 'فاتورة نشطة لم يتم تسليمها بعد'}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -658,15 +771,28 @@ export default function InvoicesPage() {
                                 "h-10 w-10 rounded-lg flex items-center justify-center",
                                 invoice.is_archived
                                   ? "bg-amber-500/15 text-amber-600"
-                                  : "bg-gradient-to-br from-blue-500/20 to-blue-500/10 text-blue-500"
+                                  : invoice.status === 'delivered'
+                                    ? "bg-emerald-500/15 text-emerald-600"
+                                    : "bg-gradient-to-br from-blue-500/20 to-blue-500/10 text-blue-500"
                               )}>
-                                {invoice.is_archived ? <Archive className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+                                {invoice.is_archived ? (
+                                  <Archive className="h-5 w-5" />
+                                ) : invoice.status === 'delivered' ? (
+                                  <CheckCircle2 className="h-5 w-5" />
+                                ) : (
+                                  <FileText className="h-5 w-5" />
+                                )}
                               </div>
                               <div className="flex flex-col">
                                 <span className="font-mono font-medium">{invoice.invoice_number}</span>
                                 {invoice.is_archived && (
                                   <Badge variant="outline" className="w-fit text-[10px] py-0 px-1.5 mt-0.5 bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/50 dark:text-amber-400">
                                     مؤرشفة
+                                  </Badge>
+                                )}
+                                {invoice.status === 'delivered' && !invoice.is_archived && (
+                                  <Badge variant="outline" className="w-fit text-[10px] py-0 px-1.5 mt-0.5 bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/50 dark:text-emerald-400">
+                                    تم التسليم
                                   </Badge>
                                 )}
                               </div>
@@ -717,9 +843,76 @@ export default function InvoicesPage() {
                             </span>
                           </TableCell>
                           <TableCell>
-                            <Badge className={cn("gap-1", statusColor)}>
-                              {getStatusLabel(invoice.status)}
-                            </Badge>
+                            {!invoice.is_archived && hasPermission('edit invoices') ? (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button
+                                    type="button"
+                                    disabled={updateStatusMutation.isPending}
+                                    className="inline-flex items-center gap-1 group/btn focus:outline-none focus:ring-2 focus:ring-primary/20 rounded-full transition-all"
+                                    title="انقر لتغيير حالة الفاتورة"
+                                  >
+                                    <Badge className={cn("gap-1.5 cursor-pointer hover:shadow-sm hover:brightness-95 transition-all select-none px-2.5 py-0.5", statusColor)}>
+                                      <span>{getStatusLabel(invoice.status)}</span>
+                                      <ChevronDown className="h-3 w-3 opacity-60 group-hover/btn:opacity-100 transition-opacity" />
+                                    </Badge>
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56">
+                                  <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                                    تغيير حالة الفاتورة
+                                  </DropdownMenuLabel>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem 
+                                    className={cn("flex items-center justify-between cursor-pointer", invoice.status === 'new' && "font-semibold bg-accent")}
+                                    onClick={() => updateStatusMutation.mutate({ id: invoice.id, status: 'new' })}
+                                  >
+                                    <span>جديدة</span>
+                                    {invoice.status === 'new' && <Check className="h-4 w-4 text-primary" />}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    className={cn("flex items-center justify-between cursor-pointer", invoice.status === 'in_progress' && "font-semibold bg-accent")}
+                                    onClick={() => updateStatusMutation.mutate({ id: invoice.id, status: 'in_progress' })}
+                                  >
+                                    <span>قيد التنفيذ</span>
+                                    {invoice.status === 'in_progress' && <Check className="h-4 w-4 text-purple-600" />}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    className={cn("flex items-center justify-between cursor-pointer", invoice.status === 'ready' && "font-semibold bg-accent")}
+                                    onClick={() => updateStatusMutation.mutate({ id: invoice.id, status: 'ready' })}
+                                  >
+                                    <span>جاهزة للتسليم</span>
+                                    {invoice.status === 'ready' && <Check className="h-4 w-4 text-orange-600" />}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem 
+                                    className={cn(
+                                      "flex items-center justify-between cursor-pointer text-emerald-700 dark:text-emerald-400 font-medium hover:bg-emerald-50 dark:hover:bg-emerald-950/60",
+                                      invoice.status === 'delivered' && "bg-emerald-100 dark:bg-emerald-950 font-semibold"
+                                    )}
+                                    onClick={() => updateStatusMutation.mutate({ id: invoice.id, status: 'delivered' })}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                      <span>تم التسليم (نقل لقسم المسلّمات)</span>
+                                    </div>
+                                    {invoice.status === 'delivered' && <Check className="h-4 w-4 text-emerald-600" />}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem 
+                                    className={cn("flex items-center justify-between cursor-pointer text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/60", invoice.status === 'cancelled' && "bg-accent font-semibold")}
+                                    onClick={() => updateStatusMutation.mutate({ id: invoice.id, status: 'cancelled' })}
+                                  >
+                                    <span>ملغية</span>
+                                    {invoice.status === 'cancelled' && <Check className="h-4 w-4 text-rose-600" />}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            ) : (
+                              <Badge className={cn("gap-1", statusColor)}>
+                                {getStatusLabel(invoice.status)}
+                              </Badge>
+                            )}
                           </TableCell>
                           <TableCell>
                             <Badge className={cn("gap-1", getPaymentStatusColor(getPaymentStatus(total, paid)))}>
@@ -728,6 +921,33 @@ export default function InvoicesPage() {
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center justify-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                              {/* Quick Deliver or Revert Action */}
+                              {!invoice.is_archived && hasPermission('edit invoices') && (
+                                activeTab === 'active' && invoice.status !== 'delivered' ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950"
+                                    title="تسليم الفاتورة فوراً ونقلها لقسم تم التسليم"
+                                    disabled={updateStatusMutation.isPending}
+                                    onClick={() => updateStatusMutation.mutate({ id: invoice.id, status: 'delivered' })}
+                                  >
+                                    <CheckCircle2 className="h-4 w-4" />
+                                  </Button>
+                                ) : activeTab === 'delivered' ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950"
+                                    title="إلغاء التسليم وإعادة الفاتورة لقائمة النشطة"
+                                    disabled={updateStatusMutation.isPending}
+                                    onClick={() => updateStatusMutation.mutate({ id: invoice.id, status: 'ready' })}
+                                  >
+                                    <RotateCcw className="h-4 w-4" />
+                                  </Button>
+                                ) : null
+                              )}
+
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -820,13 +1040,31 @@ export default function InvoicesPage() {
                   className="flex flex-col items-center justify-center py-16 text-center"
                 >
                   <div className="h-20 w-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                    <Receipt className="h-10 w-10 text-muted-foreground" />
+                    {activeTab === 'delivered' ? (
+                      <CheckCircle2 className="h-10 w-10 text-emerald-500" />
+                    ) : activeTab === 'archived' ? (
+                      <Archive className="h-10 w-10 text-amber-500" />
+                    ) : (
+                      <Receipt className="h-10 w-10 text-muted-foreground" />
+                    )}
                   </div>
-                  <h3 className="text-lg font-semibold mb-2">لا توجد فواتير</h3>
+                  <h3 className="text-lg font-semibold mb-2">
+                    {activeTab === 'delivered'
+                      ? 'لا توجد فواتير مسلّمة'
+                      : activeTab === 'archived'
+                        ? 'لا توجد فواتير مؤرشفة'
+                        : 'لا توجد فواتير نشطة'}
+                  </h3>
                   <p className="text-muted-foreground mb-4">
-                    {hasActiveFilters ? 'لم يتم العثور على فواتير مطابقة للفلترة' : 'ابدأ بإنشاء فاتورة جديدة'}
+                    {hasActiveFilters
+                      ? 'لم يتم العثور على فواتير مطابقة للفلترة'
+                      : activeTab === 'delivered'
+                        ? 'عند تحويل حالة أي فاتورة إلى "تم التسليم"، ستنتقل مباشرة إلى هذا القسم'
+                        : activeTab === 'archived'
+                          ? 'لا توجد فواتير مؤرشفة حالياً'
+                          : 'جميع الفواتير تم تسليمها أو يمكنك إنشاء فاتورة جديدة'}
                   </p>
-                  {hasPermission('create invoices') && !hasActiveFilters && (
+                  {hasPermission('create invoices') && !hasActiveFilters && activeTab === 'active' && (
                     <Button onClick={() => navigate('/invoices/create')}>
                       <Plus className="h-4 w-4 ml-2" />
                       إنشاء فاتورة

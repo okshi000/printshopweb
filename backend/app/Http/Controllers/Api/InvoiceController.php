@@ -11,6 +11,7 @@ use App\Models\Supplier;
 use App\Models\ActivityLog;
 use App\Models\CashBalance;
 use App\Models\CashMovement;
+use App\Models\KanbanColumn;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -19,15 +20,20 @@ class InvoiceController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $isArchived = $request->boolean('archived') || $request->input('archived') === 'true' || $request->input('tab') === 'archived';
+        $tab = $request->input('tab');
+        $isArchived = $request->boolean('archived') || $request->input('archived') === 'true' || $tab === 'archived';
 
         if ($isArchived) {
             $query = Invoice::withoutGlobalScope('notArchived')->where('invoices.is_archived', true)->with('customer');
+        } elseif ($tab === 'delivered') {
+            $query = Invoice::with('customer')->where('status', 'delivered');
+        } elseif ($tab === 'active') {
+            $query = Invoice::with('customer')->where('status', '!=', 'delivered');
         } else {
             $query = Invoice::with('customer');
         }
 
-        if ($request->has('search')) {
+        if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('invoice_number', 'like', "%{$search}%")
@@ -37,7 +43,7 @@ class InvoiceController extends Controller
             });
         }
 
-        if ($request->has('status')) {
+        if ($request->filled('status') && $request->status !== 'all') {
             $query->where('status', $request->status);
         }
 
@@ -306,16 +312,40 @@ class InvoiceController extends Controller
         ]);
 
         $oldStatus = $invoice->status;
-        $invoice->update(['status' => $validated['status']]);
+        $newStatus = $validated['status'];
+
+        DB::transaction(function () use ($invoice, $newStatus) {
+            $invoice->update(['status' => $newStatus]);
+
+            // Sync with kanban cards if they exist
+            if ($newStatus === 'delivered') {
+                $finalKey = KanbanColumn::where('is_final', true)->value('key') ?? 'delivered';
+                $invoice->kanbanCards()->update([
+                    'status' => $finalKey,
+                    'delivered_at' => now(),
+                ]);
+            } elseif ($invoice->kanbanCards()->exists() && $newStatus !== 'cancelled') {
+                $finalKeys = KanbanColumn::getFinalStageKeys();
+                $targetKanbanStatus = match ($newStatus) {
+                    'ready' => 'in_office',
+                    'in_progress' => 'in_printing',
+                    default => KanbanColumn::getInitialStageKey(),
+                };
+                $invoice->kanbanCards()->whereIn('status', $finalKeys)->update([
+                    'status' => $targetKanbanStatus,
+                    'delivered_at' => null,
+                ]);
+            }
+        });
 
         ActivityLog::log(
             'update',
             'invoices',
-            "تغيير حالة الفاتورة {$invoice->invoice_number} من {$oldStatus} إلى {$validated['status']}",
+            "تغيير حالة الفاتورة {$invoice->invoice_number} من {$oldStatus} إلى {$newStatus}",
             $invoice->id
         );
 
-        return response()->json($invoice);
+        return response()->json($invoice->fresh(['customer', 'items.costs', 'payments']));
     }
 
     public function addPayment(Request $request, Invoice $invoice): JsonResponse
@@ -374,7 +404,8 @@ class InvoiceController extends Controller
             $q->where('invoice_date', '>=', $fromDate);
         })->sum('amount');
 
-        $activeInvoicesCount = Invoice::count();
+        $activeInvoicesCount = Invoice::where('status', '!=', 'delivered')->count();
+        $deliveredInvoicesCount = Invoice::where('status', 'delivered')->count();
         $archivedInvoicesCount = Invoice::withoutGlobalScope('notArchived')->where('invoices.is_archived', true)->count();
 
         $responseData = [
@@ -383,6 +414,7 @@ class InvoiceController extends Controller
             'to_date' => now()->toDateString(),
             'total_invoices' => $totalInvoices,
             'active_invoices_count' => $activeInvoicesCount,
+            'delivered_invoices_count' => $deliveredInvoicesCount,
             'archived_invoices_count' => $archivedInvoicesCount,
             'total_sales' => round($totalSales, 2),
             'total_paid' => round($totalPaid, 2),

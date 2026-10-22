@@ -318,7 +318,7 @@ class KanbanController extends Controller
                 } elseif ($totalCards > 0 && ($inOfficeCards + $deliveredCards) === $totalCards) {
                     $invoice->update(['status' => 'ready']);
                 } elseif (!$isFinal) {
-                    if ($invoice->status === 'new') {
+                    if ($invoice->status === 'new' || $invoice->status === 'delivered') {
                         $invoice->update(['status' => 'in_progress']);
                     }
                 }

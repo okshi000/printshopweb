@@ -155,9 +155,17 @@ export default function ViewInvoicePage() {
 
   const statusMutation = useMutation({
     mutationFn: async (status: string) => invoicesApi.updateStatus(Number(id), status),
-    onSuccess: () => {
-      toast.success('تم تحديث حالة الفاتورة')
+    onSuccess: (_, newStatus) => {
+      if (newStatus === 'delivered') {
+        toast.success('تم تحويل حالة الفاتورة إلى "تم التسليم" ونقلها لقسم المسلّمات')
+      } else {
+        toast.success('تم تحديث حالة الفاتورة بنجاح')
+      }
       queryClient.invalidateQueries({ queryKey: ['invoice', id] })
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      queryClient.invalidateQueries({ queryKey: ['invoices-statistics-tab-counts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['kanban'] })
     },
     onError: (error: any) => toast.error(error.response?.data?.message || 'فشل تحديث الحالة'),
   })
