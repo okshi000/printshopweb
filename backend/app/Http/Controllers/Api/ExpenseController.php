@@ -42,7 +42,7 @@ class ExpenseController extends Controller
         $validated = $request->validate([
             'expense_type_id' => 'required|exists:expense_types,id',
             'amount' => 'required|numeric|min:0.01',
-            'payment_method' => 'required|in:cash,bank',
+            'payment_method' => 'required|in:drawer,vault,bank,cash',
             'expense_date' => 'required|date',
             'notes' => 'nullable|string',
         ]);

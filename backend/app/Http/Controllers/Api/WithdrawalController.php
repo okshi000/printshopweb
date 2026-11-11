@@ -37,7 +37,7 @@ class WithdrawalController extends Controller
         $validated = $request->validate([
             'withdrawn_by' => 'required|string|max:100',
             'amount' => 'required|numeric|min:0.01',
-            'payment_method' => 'required|in:cash,bank',
+            'payment_method' => 'required|in:drawer,vault,bank,cash',
             'withdrawal_date' => 'required|date',
             'notes' => 'nullable|string',
         ]);

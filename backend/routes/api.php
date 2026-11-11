@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\AccountantController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\KanbanController;
+use App\Http\Controllers\Api\CustodyController;
 use App\Http\Controllers\ReportsController;
 
 // Public routes
@@ -90,6 +91,12 @@ Route::middleware(['auth:sanctum', 'api.permission'])->group(function () {
     Route::post('/cash/transfer', [CashController::class, 'transfer']);
     Route::post('/cash/set-initial', [CashController::class, 'setInitial']);
     Route::post('/cash/adjust', [CashController::class, 'adjust']);
+
+    // Custodies (العُهد)
+    Route::get('/custodies', [CustodyController::class, 'index']);
+    Route::post('/custodies', [CustodyController::class, 'store']);
+    Route::post('/custodies/{custody}/settle', [CustodyController::class, 'settle']);
+    Route::delete('/custodies/{custody}', [CustodyController::class, 'destroy']);
 
     // Inventory
     Route::apiResource('inventory', InventoryController::class);

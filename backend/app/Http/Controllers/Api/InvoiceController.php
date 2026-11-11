@@ -459,7 +459,7 @@ class InvoiceController extends Controller
         
         $validated = $request->validate([
             'amount' => 'required|numeric|min:0.01|max:' . max($remainingAmount, 0.01),
-            'payment_method' => 'required|in:cash,bank',
+            'payment_method' => 'required|in:drawer,vault,bank,cash',
             'payment_type' => 'required|in:deposit,partial,full',
             'payment_date' => 'nullable|date',
             'notes' => 'nullable|string',

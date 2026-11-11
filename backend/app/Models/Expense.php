@@ -9,6 +9,7 @@ class Expense extends Model
 {
     protected $fillable = [
         'expense_type_id',
+        'custody_id',
         'amount',
         'payment_method',
         'expense_date',
@@ -26,18 +27,31 @@ class Expense extends Model
         return $this->belongsTo(ExpenseType::class);
     }
 
+    public function custody(): BelongsTo
+    {
+        return $this->belongsTo(Custody::class);
+    }
+
     protected static function booted(): void
     {
         static::created(function (Expense $expense) {
-            CashBalance::updateBalance($expense->payment_method, -$expense->amount);
+            // إذا كان المصروف ناتجاً عن تسوية عهدة، فلا يتم خصم المبلغ من رصيد الخزنة/الدرج مرة أخرى
+            // لأن المبلغ خُصم بالفعل عند صرف العهدة مسبقاً
+            if ($expense->custody_id) {
+                return;
+            }
+
+            $method = $expense->payment_method ?: 'drawer';
+            CashBalance::updateBalance($method, -$expense->amount);
             
             CashMovement::create([
                 'movement_type' => 'expense',
-                'source' => $expense->payment_method,
+                'source' => $method,
                 'amount' => $expense->amount,
                 'reference_type' => 'expense',
                 'reference_id' => $expense->id,
-                'description' => "مصروف: {$expense->expenseType->name}",
+                'description' => "مصروف: {$expense->expenseType->name}" . ($expense->notes ? " - {$expense->notes}" : ''),
+                'movement_date' => now(),
             ]);
         });
     }

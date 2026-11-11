@@ -152,25 +152,56 @@ export interface Withdrawal {
 }
 
 export interface CashBalance {
+  drawer_balance?: number;
+  vault_balance?: number;
   cash_balance: number;
   bank_balance: number;
   total_balance: number;
+  open_custodies_total?: number;
+  open_custodies_count?: number;
   cash?: number;
   bank?: number;
 }
 
 export interface CashMovement {
   id: number;
-  movement_type: 'income' | 'expense' | 'transfer' | 'withdrawal' | 'initial' | 'invoice_payment' | 'supplier_payment' | 'debt_repayment' | 'debt_created';
+  movement_type: string;
   type?: string;
-  source: 'cash' | 'bank';
-  destination: 'cash' | 'bank' | null;
+  source: string;
+  destination: string | null;
   amount: number;
   reference_type: string | null;
   reference_id: number | null;
   description: string | null;
   movement_date: string;
   created_at?: string;
+}
+
+export interface Custody {
+  id: number;
+  employee_name: string;
+  user_id?: number | null;
+  amount: number;
+  spent_amount: number;
+  returned_amount: number;
+  status: 'open' | 'settled';
+  source: string;
+  purpose?: string | null;
+  disbursed_at: string;
+  settled_at?: string | null;
+  expense_type_id?: number | null;
+  expense_id?: number | null;
+  settlement_notes?: string | null;
+  receipt_attachment?: string | null;
+  created_by?: number | null;
+  settled_by?: number | null;
+  created_at?: string;
+  updated_at?: string;
+  user?: { id: number; name: string; full_name?: string };
+  expense_type?: { id: number; name: string };
+  expense?: { id: number; amount: number; expense_date: string };
+  creator?: { id: number; name: string };
+  settler?: { id: number; name: string };
 }
 
 export interface InventoryItem {

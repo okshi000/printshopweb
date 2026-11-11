@@ -30,15 +30,28 @@ class InvoicePayment extends Model
     {
         static::saved(function (InvoicePayment $payment) {
             $payment->invoice->recalculateTotals();
-            CashBalance::updateBalance($payment->payment_method, $payment->amount);
             
+            $method = $payment->payment_method ?: 'drawer';
+            if ($method === 'cash') {
+                $method = 'drawer';
+            }
+            CashBalance::updateBalance($method, $payment->amount);
+            
+            $methodLabel = match($method) {
+                'drawer' => 'درج المكتب',
+                'vault' => 'الخزينة الرئيسية',
+                'bank' => 'حساب البنك',
+                default => $method,
+            };
+
             CashMovement::create([
                 'movement_type' => 'income',
-                'source' => $payment->payment_method,
+                'source' => $method,
                 'amount' => $payment->amount,
                 'reference_type' => 'invoice_payment',
                 'reference_id' => $payment->id,
-                'description' => "دفعة للفاتورة #{$payment->invoice->invoice_number}",
+                'description' => "دفعة للفاتورة #{$payment->invoice->invoice_number} ({$methodLabel})",
+                'movement_date' => $payment->payment_date ?? now(),
             ]);
         });
     }

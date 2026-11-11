@@ -133,6 +133,21 @@ export const cashApi = {
   adjust: (data: Record<string, unknown>) => api.post('/cash/adjust', data),
 };
 
+// Custodies API (العُهد)
+export const custodiesApi = {
+  list: (params?: Record<string, unknown>) => api.get('/custodies', { params }),
+  create: (data: Record<string, unknown>) => api.post('/custodies', data),
+  settle: (id: number, data: FormData | Record<string, unknown>) => {
+    if (data instanceof FormData) {
+      return api.post(`/custodies/${id}/settle`, data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    }
+    return api.post(`/custodies/${id}/settle`, data);
+  },
+  delete: (id: number) => api.delete(`/custodies/${id}`),
+};
+
 // Inventory API
 export const inventoryApi = {
   list: (params?: Record<string, unknown>) => api.get('/inventory', { params }),
@@ -268,6 +283,10 @@ export const kanbanApi = {
     api.delete<{ message: string }>(`/kanban/columns/${id}`, { data: { fallback_column_key: fallbackColumnKey } }),
   reorderColumns: (columnIds: number[]) =>
     api.post<{ message: string; columns: KanbanColumnItem[] }>('/kanban/columns/reorder', { column_ids: columnIds }),
+};
+
+export const usersApi = {
+  list: (params?: Record<string, unknown>) => api.get('/users', { params }),
 };
 
 // تصدير APIs التقارير

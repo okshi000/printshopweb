@@ -81,7 +81,7 @@ class DebtController extends Controller
     {
         $validated = $request->validate([
             'amount' => 'required|numeric|min:0.01|max:' . $debt->remaining_amount,
-            'payment_method' => 'required|in:cash,bank',
+            'payment_method' => 'required|in:drawer,vault,bank,cash',
             'notes' => 'nullable|string',
         ]);
 

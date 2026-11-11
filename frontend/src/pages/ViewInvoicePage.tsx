@@ -117,7 +117,7 @@ export default function ViewInvoicePage() {
   const queryClient = useQueryClient()
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState('cash')
+  const [paymentMethod, setPaymentMethod] = useState('drawer')
   const [paymentType, setPaymentType] = useState('partial')
   const [paymentNotes, setPaymentNotes] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState(false)
@@ -751,12 +751,13 @@ export default function ViewInvoicePage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>طريقة الدفع</Label>
+              <Label>حساب الاستلام / طريقة الدفع</Label>
               <Select value={paymentMethod} onValueChange={setPaymentMethod}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="cash">نقدي</SelectItem>
-                  <SelectItem value="bank">بنكي</SelectItem>
+                  <SelectItem value="drawer">💵 درج المكتب (نقدي)</SelectItem>
+                  <SelectItem value="vault">🏦 الخزينة الرئيسية (نقدي)</SelectItem>
+                  <SelectItem value="bank">💳 حساب البنك (تحويل)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

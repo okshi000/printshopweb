@@ -102,7 +102,10 @@ const formatDate = (date: string | null | undefined, formatStr: string, options?
 
 const getPaymentMethodName = (method: string): string => {
   const methods: Record<string, string> = {
+    'drawer': 'درج المكتب (نقدي)',
+    'vault': 'الخزينة الرئيسية (نقدي)',
     'cash': 'نقدي',
+    'bank': 'بنكي',
     'bank_transfer': 'تحويل بنكي',
     'check': 'شيك',
     'credit_card': 'بطاقة ائتمان',
