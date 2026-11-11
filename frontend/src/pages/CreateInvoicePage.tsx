@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -59,6 +59,7 @@ interface InvoiceItem {
 }
 export default function CreateInvoicePage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { hasPermission } = useAuth()
   const { id } = useParams<{ id: string }>()
   const [searchParams] = useSearchParams()
@@ -74,6 +75,7 @@ export default function CreateInvoicePage() {
   const [isProforma, setIsProforma] = useState(
     searchParams.get('type') === 'proforma' || searchParams.get('proforma') === 'true'
   )
+  const [hasPayments, setHasPayments] = useState(false)
 
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false)
   const [productModalItemId, setProductModalItemId] = useState<string | null>(null)
@@ -97,6 +99,7 @@ export default function CreateInvoicePage() {
           setDeliveryDate(invoice.delivery_date ? new Date(invoice.delivery_date) : null)
           setNotes(invoice.notes || '')
           setIsProforma(!!invoice.is_proforma)
+          setHasPayments(Number(invoice.paid_amount || 0) > 0 || (Array.isArray(invoice.payments) && invoice.payments.length > 0))
           if (invoice.discount && Number(invoice.discount) > 0) {
             setDiscountValue(Number(invoice.discount).toString())
             setDiscountType('fixed')
@@ -178,8 +181,15 @@ export default function CreateInvoicePage() {
       return invoicesApi.create(data)
     },
     onSuccess: (res) => {
+      const invoiceData = res.data?.invoice || res.data?.data || res.data
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      queryClient.invalidateQueries({ queryKey: ['invoice', id] })
+      queryClient.invalidateQueries({ queryKey: ['invoice'] })
+      queryClient.invalidateQueries({ queryKey: ['invoices-statistics-tab-counts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['kanban'] })
       toast.success(isEditMode ? 'تم تحديث الفاتورة بنجاح' : 'تم إنشاء الفاتورة بنجاح')
-      navigate(`/invoices/${res.data.data?.id || res.data.id}`)
+      navigate(`/invoices/${invoiceData?.id || id}`)
     },
     onError: (error: any) => toast.error(error.response?.data?.message || (isEditMode ? 'فشل تحديث الفاتورة' : 'فشل إنشاء الفاتورة')),
   })
@@ -346,18 +356,31 @@ export default function CreateInvoicePage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setIsProforma(true)}
+                    onClick={() => {
+                      if (isEditMode && hasPayments) {
+                        toast.error('لا يمكن تحويل الفاتورة إلى مبدئية لوجود دفعات مسجلة عليها')
+                        return
+                      }
+                      setIsProforma(true)
+                    }}
+                    disabled={isEditMode && hasPayments}
                     className={cn(
                       "flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-sm font-medium transition-all",
                       isProforma
                         ? "bg-purple-600 text-white border-purple-600 shadow-sm"
-                        : "bg-card hover:bg-accent text-muted-foreground border-border"
+                        : "bg-card hover:bg-accent text-muted-foreground border-border",
+                      isEditMode && hasPayments && "opacity-50 cursor-not-allowed"
                     )}
                   >
                     <FileClock className="h-4 w-4" />
                     <span>فاتورة مبدئية (عرض سعر)</span>
                   </button>
                 </div>
+                {isEditMode && hasPayments && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    ⚠️ لا يمكن تحويل هذه الفاتورة إلى مبدئية نظراً لوجود دفعات مالية مسجلة عليها.
+                  </p>
+                )}
                 {isProforma && (
                   <div className="rounded-lg bg-purple-500/10 border border-purple-500/20 p-2.5 text-xs text-purple-900 dark:text-purple-300 flex items-start gap-2">
                     <FileClock className="h-4 w-4 shrink-0 mt-0.5 text-purple-600 dark:text-purple-400" />

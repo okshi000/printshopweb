@@ -121,6 +121,7 @@ class InvoiceController extends Controller
             $invoice = Invoice::create([
                 'invoice_number' => $invoiceNumber,
                 'is_proforma' => $isProforma,
+                'proforma_number' => $isProforma ? $invoiceNumber : null,
                 'customer_id' => $validated['customer_id'] ?? null,
                 'invoice_date' => $validated['invoice_date'] ?? now()->toDateString(),
                 'delivery_date' => $validated['delivery_date'] ?? null,
@@ -208,6 +209,7 @@ class InvoiceController extends Controller
         }
 
         $validated = $request->validate([
+            'is_proforma' => 'nullable|boolean',
             'customer_id' => 'nullable|exists:customers,id',
             'invoice_date' => 'nullable|date',
             'delivery_date' => 'nullable|date',
@@ -228,18 +230,65 @@ class InvoiceController extends Controller
             'items.*.costs.*.notes' => 'nullable|string',
         ]);
 
-        return DB::transaction(function () use ($validated, $invoice, $request) {
+        $hasIsProforma = $request->has('is_proforma');
+        $targetIsProforma = $hasIsProforma
+            ? ($request->boolean('is_proforma') || $request->input('is_proforma') === true || $request->input('is_proforma') === 'true' || $request->input('is_proforma') === 1 || $request->input('is_proforma') === '1')
+            : (bool) $invoice->is_proforma;
+
+        if (!$invoice->is_proforma && $targetIsProforma) {
+            if ($invoice->paid_amount > 0 || $invoice->payments()->exists()) {
+                return response()->json(['message' => 'لا يمكن تحويل الفاتورة إلى فاتورة مبدئية لوجود دفعات مسجلة عليها.'], 422);
+            }
+        }
+
+        return DB::transaction(function () use ($validated, $invoice, $request, $hasIsProforma, $targetIsProforma) {
             $oldValues = $invoice->toArray();
-            
-            // Update basic invoice data
-            $invoice->update([
+
+            // Collect existing suppliers before any item changes
+            $oldSupplierIds = $invoice->items()
+                ->with('costs')
+                ->get()
+                ->flatMap(fn($item) => $item->costs->pluck('supplier_id'))
+                ->unique()
+                ->filter();
+
+            $updateData = [
                 'customer_id' => $validated['customer_id'] ?? $invoice->customer_id,
                 'invoice_date' => $validated['invoice_date'] ?? $invoice->invoice_date,
                 'delivery_date' => $validated['delivery_date'] ?? $invoice->delivery_date,
                 'discount' => array_key_exists('discount', $validated) ? max(0, (float) ($validated['discount'] ?? 0)) : $invoice->discount,
                 'notes' => $validated['notes'] ?? $invoice->notes,
                 'status' => $validated['status'] ?? $invoice->status,
-            ]);
+            ];
+
+            $isProformaChanged = false;
+            if ($hasIsProforma && (bool) $invoice->is_proforma !== $targetIsProforma) {
+                $isProformaChanged = true;
+                if ($targetIsProforma) {
+                    // تحويل من نهائية إلى مبدئية
+                    $profNum = ($invoice->proforma_number && str_starts_with($invoice->proforma_number, 'PROF-'))
+                        ? $invoice->proforma_number
+                        : Invoice::generateProformaNumber();
+
+                    $updateData['is_proforma'] = true;
+                    $updateData['proforma_number'] = $profNum;
+                    $updateData['invoice_number'] = $profNum;
+
+                    // حذف أي كروت كانبان تابعة لهذه الفاتورة
+                    \App\Models\KanbanCard::where('invoice_id', $invoice->id)->delete();
+                } else {
+                    // تحويل من مبدئية إلى نهائية
+                    $oldProfNum = $invoice->invoice_number;
+                    $updateData['is_proforma'] = false;
+                    $updateData['proforma_number'] = $oldProfNum;
+                    if (str_starts_with($invoice->invoice_number, 'PROF-') || empty($invoice->invoice_number)) {
+                        $updateData['invoice_number'] = Invoice::generateInvoiceNumber();
+                    }
+                }
+            }
+
+            // Update basic invoice data
+            $invoice->update($updateData);
 
             $canManageCosts = $request->user()->hasPermissionTo('invoices.manage_costs');
 
@@ -295,12 +344,51 @@ class InvoiceController extends Controller
                 }
             }
 
+            // If invoice is final, ensure kanban cards exist for its items
+            if (!$invoice->is_proforma) {
+                $initialStage = \App\Models\KanbanColumn::getInitialStageKey();
+                foreach ($invoice->fresh()->items as $item) {
+                    if (!\App\Models\KanbanCard::where('invoice_item_id', $item->id)->exists()) {
+                        $nextSortOrder = (int) (\App\Models\KanbanCard::where('status', $initialStage)->max('sort_order') ?? 0) + 1;
+                        \App\Models\KanbanCard::create([
+                            'invoice_id' => $invoice->id,
+                            'invoice_item_id' => $item->id,
+                            'item_name' => $item->product_name ?? 'بند جديد',
+                            'description' => $item->description,
+                            'quantity' => $item->quantity ?? 1,
+                            'status' => $initialStage,
+                            'sort_order' => $nextSortOrder,
+                        ]);
+                    }
+                }
+            }
+
+            // Recalculate supplier balances for all affected suppliers
+            $newSupplierIds = $invoice->items()
+                ->with('costs')
+                ->get()
+                ->flatMap(fn($item) => $item->costs->pluck('supplier_id'))
+                ->unique()
+                ->filter();
+
+            $allSupplierIds = $oldSupplierIds->merge($newSupplierIds)->unique();
+            foreach ($allSupplierIds as $supplierId) {
+                \App\Models\Supplier::find($supplierId)?->recalculateBalance();
+            }
+
             $invoice->recalculateTotals();
+
+            $actionTitle = "تعديل الفاتورة: {$invoice->invoice_number}";
+            if ($isProformaChanged) {
+                $actionTitle = $targetIsProforma
+                    ? "تحويل الفاتورة إلى مبدئية: {$invoice->invoice_number}"
+                    : "اعتماد وتحويل الفاتورة إلى نهائية: {$invoice->invoice_number}";
+            }
 
             ActivityLog::log(
                 'update',
                 'invoices',
-                "تعديل الفاتورة: {$invoice->invoice_number}",
+                $actionTitle,
                 $invoice->id,
                 $oldValues,
                 $invoice->toArray()
