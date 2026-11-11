@@ -27,6 +27,11 @@ class Customer extends Model
         return $this->hasMany(Invoice::class);
     }
 
+    public function proformaInvoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class)->withoutGlobalScope('notProforma')->where('invoices.is_proforma', true);
+    }
+
     public function archivedInvoices(): HasMany
     {
         return $this->hasMany(Invoice::class)->withoutGlobalScope('notArchived')->where('invoices.is_archived', true);
@@ -34,7 +39,7 @@ class Customer extends Model
 
     public function allInvoices(): HasMany
     {
-        return $this->hasMany(Invoice::class)->withoutGlobalScope('notArchived');
+        return $this->hasMany(Invoice::class)->withoutGlobalScope('notArchived')->withoutGlobalScope('notProforma');
     }
 
     public function scopeActive($query)
@@ -44,6 +49,9 @@ class Customer extends Model
 
     public function getTotalDebtAttribute(): float
     {
-        return (float) $this->invoices()->where('invoices.is_archived', false)->sum('remaining_amount');
+        return (float) $this->invoices()
+            ->where('invoices.is_archived', false)
+            ->where('invoices.is_proforma', false)
+            ->sum('remaining_amount');
     }
 }

@@ -100,6 +100,8 @@ export interface Invoice {
   status: 'new' | 'in_progress' | 'ready' | 'delivered' | 'cancelled' | 'draft' | 'pending' | 'partial' | 'paid';
   is_archived?: boolean;
   archived_at?: string | null;
+  is_proforma?: boolean;
+  proforma_number?: string | null;
   subtotal: number;
   discount: number;
   total: number;

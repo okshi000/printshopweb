@@ -12,6 +12,12 @@ class InvoiceItemObserver
      */
     public function created(InvoiceItem $item): void
     {
+        // تجنب إنشاء كرت كانبان إذا كانت الفاتورة مبدئية
+        $invoice = \App\Models\Invoice::withoutGlobalScopes()->find($item->invoice_id);
+        if ($invoice && $invoice->is_proforma) {
+            return;
+        }
+
         // تجنب التكرار إذا كان الكرت موجوداً بالفعل
         $existingCard = KanbanCard::where('invoice_item_id', $item->id)->first();
         if ($existingCard) {

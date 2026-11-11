@@ -17,6 +17,8 @@ class Invoice extends Model
         'status',
         'is_archived',
         'archived_at',
+        'is_proforma',
+        'proforma_number',
         'subtotal',
         'discount',
         'total',
@@ -32,6 +34,7 @@ class Invoice extends Model
         'delivery_date' => 'date',
         'is_archived' => 'boolean',
         'archived_at' => 'datetime',
+        'is_proforma' => 'boolean',
         'subtotal' => 'decimal:2',
         'discount' => 'decimal:2',
         'total' => 'decimal:2',
@@ -54,11 +57,17 @@ class Invoice extends Model
         static::addGlobalScope('notArchived', function (Builder $builder) {
             $builder->where('invoices.is_archived', false);
         });
+
+        static::addGlobalScope('notProforma', function (Builder $builder) {
+            $builder->where('invoices.is_proforma', false);
+        });
     }
 
     public function resolveRouteBindingQuery($query, $value, $field = null)
     {
-        return parent::resolveRouteBindingQuery($query, $value, $field)->withoutGlobalScope('notArchived');
+        return parent::resolveRouteBindingQuery($query, $value, $field)
+            ->withoutGlobalScope('notArchived')
+            ->withoutGlobalScope('notProforma');
     }
 
     public function scopeArchived(Builder $query): Builder
@@ -69,6 +78,16 @@ class Invoice extends Model
     public function scopeWithArchived(Builder $query): Builder
     {
         return $query->withoutGlobalScope('notArchived');
+    }
+
+    public function scopeProforma(Builder $query): Builder
+    {
+        return $query->withoutGlobalScope('notProforma')->where('invoices.is_proforma', true);
+    }
+
+    public function scopeWithProforma(Builder $query): Builder
+    {
+        return $query->withoutGlobalScope('notProforma');
     }
 
     public function customer(): BelongsTo
@@ -94,13 +113,29 @@ class Invoice extends Model
     public static function generateInvoiceNumber(): string
     {
         $year = date('Y');
-        $lastInvoice = static::whereYear('created_at', $year)
+        $lastInvoice = static::withoutGlobalScopes()
+            ->where('is_proforma', false)
+            ->where('invoice_number', 'like', "INV-{$year}-%")
             ->orderBy('id', 'desc')
             ->first();
         
         $sequence = $lastInvoice ? ((int) substr($lastInvoice->invoice_number, -4)) + 1 : 1;
         
         return "INV-{$year}-" . str_pad($sequence, 4, '0', STR_PAD_LEFT);
+    }
+
+    public static function generateProformaNumber(): string
+    {
+        $year = date('Y');
+        $lastProforma = static::withoutGlobalScopes()
+            ->where('is_proforma', true)
+            ->where('invoice_number', 'like', "PROF-{$year}-%")
+            ->orderBy('id', 'desc')
+            ->first();
+        
+        $sequence = $lastProforma ? ((int) substr($lastProforma->invoice_number, -4)) + 1 : 1;
+        
+        return "PROF-{$year}-" . str_pad($sequence, 4, '0', STR_PAD_LEFT);
     }
 
     public function recalculateTotals(): void

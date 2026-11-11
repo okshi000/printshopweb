@@ -8,7 +8,7 @@ import { format } from 'date-fns'
 import { ar } from 'date-fns/locale'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
-  Plus, Trash2, ArrowLeft, Package, Coins, Receipt, Loader2, Calendar as CalendarIcon, Tag
+  Plus, Trash2, ArrowLeft, Package, Coins, Receipt, Loader2, Calendar as CalendarIcon, Tag, FileClock
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -71,6 +71,9 @@ export default function CreateInvoicePage() {
   const [isLoadingInvoice, setIsLoadingInvoice] = useState(false)
   const [discountValue, setDiscountValue] = useState<string>('')
   const [discountType, setDiscountType] = useState<'fixed' | 'percentage'>('fixed')
+  const [isProforma, setIsProforma] = useState(
+    searchParams.get('type') === 'proforma' || searchParams.get('proforma') === 'true'
+  )
 
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false)
   const [productModalItemId, setProductModalItemId] = useState<string | null>(null)
@@ -93,6 +96,7 @@ export default function CreateInvoicePage() {
           setCustomerId(invoice.customer_id?.toString() || '')
           setDeliveryDate(invoice.delivery_date ? new Date(invoice.delivery_date) : null)
           setNotes(invoice.notes || '')
+          setIsProforma(!!invoice.is_proforma)
           if (invoice.discount && Number(invoice.discount) > 0) {
             setDiscountValue(Number(invoice.discount).toString())
             setDiscountType('fixed')
@@ -258,6 +262,7 @@ export default function CreateInvoicePage() {
     }
 
     const data = {
+      is_proforma: isProforma,
       customer_id: parseInt(customerId),
       delivery_date: deliveryDate ? format(deliveryDate, 'yyyy-MM-dd') : null,
       notes,
@@ -293,12 +298,23 @@ export default function CreateInvoicePage() {
           <Button variant="ghost" size="icon" onClick={() => navigate('/invoices')}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg">
-            <Receipt className="h-6 w-6 text-white" />
+          <div className={cn(
+            "flex h-12 w-12 items-center justify-center rounded-xl shadow-lg transition-colors",
+            isProforma ? "bg-gradient-to-br from-purple-500 to-indigo-600 shadow-purple-500/25" : "bg-gradient-to-br from-blue-500 to-indigo-600 shadow-blue-500/25"
+          )}>
+            {isProforma ? <FileClock className="h-6 w-6 text-white" /> : <Receipt className="h-6 w-6 text-white" />}
           </div>
           <div>
-            <h1 className="text-2xl font-bold">{isEditMode ? 'تعديل الفاتورة' : 'إنشاء فاتورة جديدة'}</h1>
-            <p className="text-sm text-muted-foreground">{isEditMode ? 'تعديل بيانات الفاتورة' : 'إضافة فاتورة جديدة للعميل'}</p>
+            <h1 className="text-2xl font-bold">
+              {isEditMode 
+                ? (isProforma ? 'تعديل الفاتورة المبدئية' : 'تعديل الفاتورة') 
+                : (isProforma ? 'إنشاء فاتورة مبدئية جديدة' : 'إنشاء فاتورة جديدة')}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {isProforma 
+                ? 'عرض سعر / فاتورة مبدئية (مستبعدة من الحسابات المالية حتى يتم اعتمادها)' 
+                : (isEditMode ? 'تعديل بيانات الفاتورة' : 'إضافة فاتورة جديدة للعميل')}
+            </p>
           </div>
         </div>
       </motion.div>
@@ -311,6 +327,46 @@ export default function CreateInvoicePage() {
               <CardTitle className="text-lg">معلومات الفاتورة</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Type Switcher */}
+              <div className="rounded-xl border p-3.5 bg-muted/20 space-y-2">
+                <Label className="text-xs font-semibold text-muted-foreground">نوع الفاتورة</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsProforma(false)}
+                    className={cn(
+                      "flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-sm font-medium transition-all",
+                      !isProforma
+                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                        : "bg-card hover:bg-accent text-muted-foreground border-border"
+                    )}
+                  >
+                    <Receipt className="h-4 w-4" />
+                    <span>فاتورة نهائية</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsProforma(true)}
+                    className={cn(
+                      "flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-sm font-medium transition-all",
+                      isProforma
+                        ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+                        : "bg-card hover:bg-accent text-muted-foreground border-border"
+                    )}
+                  >
+                    <FileClock className="h-4 w-4" />
+                    <span>فاتورة مبدئية (عرض سعر)</span>
+                  </button>
+                </div>
+                {isProforma && (
+                  <div className="rounded-lg bg-purple-500/10 border border-purple-500/20 p-2.5 text-xs text-purple-900 dark:text-purple-300 flex items-start gap-2">
+                    <FileClock className="h-4 w-4 shrink-0 mt-0.5 text-purple-600 dark:text-purple-400" />
+                    <span>
+                      <strong>فاتورة مبدئية:</strong> لن تدخل في أي حسابات مالية أو أرباح أو ديون أو مراحل العمل (كانبان) حتى تعتمدها كفاتورة نهائية.
+                    </span>
+                  </div>
+                )}
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>العميل *</Label>
@@ -561,9 +617,16 @@ export default function CreateInvoicePage() {
                 )}
               </div>
 
-              <Button className="w-full gap-2" size="lg" onClick={handleSubmit} disabled={createMutation.isPending}>
+              <Button 
+                className={cn("w-full gap-2", isProforma && "bg-purple-600 hover:bg-purple-700 text-white")} 
+                size="lg" 
+                onClick={handleSubmit} 
+                disabled={createMutation.isPending}
+              >
                 {createMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                {isEditMode ? 'تحديث الفاتورة' : 'حفظ الفاتورة'}
+                {isEditMode 
+                  ? (isProforma ? 'تحديث الفاتورة المبدئية' : 'تحديث الفاتورة') 
+                  : (isProforma ? 'حفظ الفاتورة المبدئية' : 'حفظ الفاتورة')}
               </Button>
             </CardContent>
           </Card>

@@ -7,6 +7,7 @@ import {
   Truck,
   Package,
   FileText,
+  FileClock,
   Wallet,
   Receipt,
   
@@ -67,6 +68,7 @@ const navSections: NavSection[] = [
     items: [
       { icon: LayoutDashboard, label: 'لوحة التحكم', to: '/dashboard', permission: 'dashboard.view' },
       { icon: FileText, label: 'الفواتير', to: '/invoices', permission: 'invoices.view' },
+      { icon: FileClock, label: 'الفواتير المبدئية', to: '/invoices?tab=proforma', permission: 'invoices.view' },
       { icon: Kanban, label: 'لوحة المراحل (كانبان)', to: '/kanban', permission: 'invoices.view' },
       { icon: Plus, label: 'فاتورة جديدة', to: '/invoices/create', color: 'success', permission: 'invoices.create' },
     ],
@@ -247,8 +249,11 @@ export default function MainLayout() {
                 
                 <div className="space-y-1">
                   {visibleItems.map((item) => {
-                    const isActive = location.pathname === item.to || 
-                      (item.to !== '/' && location.pathname.startsWith(item.to));
+                    const itemPath = item.to.split('?')[0];
+                    const itemQuery = item.to.includes('?') ? item.to.split('?')[1] : '';
+                    const isActive = itemQuery
+                      ? (location.pathname === itemPath && location.search.includes(itemQuery))
+                      : (location.pathname === itemPath && !location.search.includes('tab=proforma'));
                     
                     return (
                       <SidebarItem

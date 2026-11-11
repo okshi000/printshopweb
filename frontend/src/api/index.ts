@@ -102,6 +102,7 @@ export const invoicesApi = {
   addPayment: (id: number, data: Record<string, unknown>) => api.post(`/invoices/${id}/payments`, data),
   archive: (id: number) => api.post(`/invoices/${id}/archive`),
   unarchive: (id: number) => api.post(`/invoices/${id}/unarchive`),
+  convertToFinal: (id: number) => api.post(`/invoices/${id}/convert-to-final`),
   statistics: (params?: Record<string, unknown>) => api.get('/invoices-statistics', { params }),
 };
 

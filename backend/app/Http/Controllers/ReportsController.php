@@ -175,6 +175,7 @@ class ReportsController extends Controller
             )
             ->join('invoices', 'customers.id', '=', 'invoices.customer_id')
             ->where('invoices.is_archived', false)
+            ->where('invoices.is_proforma', false)
             ->whereBetween('invoices.invoice_date', [$startDate, $endDate])
             ->groupBy('customers.id', 'customers.name')
             ->orderByDesc('total_purchases')
@@ -201,6 +202,7 @@ class ReportsController extends Controller
             ->join('invoice_items', 'products.id', '=', 'invoice_items.product_id')
             ->join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
             ->where('invoices.is_archived', false)
+            ->where('invoices.is_proforma', false)
             ->whereBetween('invoices.invoice_date', [$startDate, $endDate])
             ->groupBy('products.id', 'products.name')
             ->orderByDesc('quantity_sold')
@@ -227,6 +229,7 @@ class ReportsController extends Controller
             ->join('invoice_items', 'products.id', '=', 'invoice_items.product_id')
             ->join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
             ->where('invoices.is_archived', false)
+            ->where('invoices.is_proforma', false)
             ->whereBetween('invoices.invoice_date', [$startDate, $endDate])
             ->groupBy('products.id', 'products.name')
             ->orderByDesc('quantity_sold')
@@ -554,6 +557,7 @@ class ReportsController extends Controller
         // تكلفة البضاعة المباعة
         $costOfGoodsSold = InvoiceItem::join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
             ->where('invoices.is_archived', false)
+            ->where('invoices.is_proforma', false)
             ->whereBetween('invoices.invoice_date', [$startDate, $endDate])
             ->sum('invoice_items.total_cost');
 

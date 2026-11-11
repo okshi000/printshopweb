@@ -49,6 +49,8 @@ interface InvoicePayment {
 interface Invoice {
   id: number
   invoice_number: string
+  is_proforma?: boolean
+  proforma_number?: string | null
   customer_name: string
   customer_phone?: string
   customer_whatsapp_name?: string
@@ -289,6 +291,24 @@ const PrintableInvoice = ({ invoice, settings }: PrintableInvoiceProps) => {
         </div>
       </div>
 
+      {/* Proforma Watermark Banner */}
+      {invoice.is_proforma && (
+        <div style={{
+          margin: '0 0 15px',
+          padding: '8px 12px',
+          backgroundColor: '#faf5ff',
+          border: '2px dashed #9333ea',
+          borderRadius: '8px',
+          color: '#6b21a8',
+          fontWeight: 'bold',
+          fontSize: '15px',
+          textAlign: 'center',
+          letterSpacing: '0.5px'
+        }}>
+          فاتورة مبدئية / عرض أسعار (غير معتمدة مالياً)
+        </div>
+      )}
+
       {/* Invoice & Customer Info */}
       <div style={styles.infoGrid}>
         <div style={styles.infoBox}>
@@ -305,17 +325,20 @@ const PrintableInvoice = ({ invoice, settings }: PrintableInvoiceProps) => {
         </div>
 
         <div style={styles.infoBox}>
-          <h3 style={styles.infoBoxTitle}>بيانات الفاتورة</h3>
-          <p><strong>رقم الفاتورة:</strong> {invoice.invoice_number}</p>
+          <h3 style={styles.infoBoxTitle}>{invoice.is_proforma ? 'بيانات الفاتورة المبدئية' : 'بيانات الفاتورة'}</h3>
+          <p><strong>{invoice.is_proforma ? 'رقم العرض/المبدئية:' : 'رقم الفاتورة:'}</strong> {invoice.proforma_number || invoice.invoice_number}</p>
           <p><strong>التاريخ:</strong> {formatDate(invoice.invoice_date || invoice.created_at, 'dd MMMM yyyy', { locale: ar })}</p>
           {invoice.delivery_date && (
-            <p><strong>تاريخ التسليم:</strong> {formatDate(invoice.delivery_date, 'dd MMMM yyyy', { locale: ar })}</p>
+            <p><strong>{invoice.is_proforma ? 'تاريخ التسليم المتوقع:' : 'تاريخ التسليم:'}</strong> {formatDate(invoice.delivery_date, 'dd MMMM yyyy', { locale: ar })}</p>
+          )}
+          {invoice.is_proforma && (
+            <p><strong>نوع المستند:</strong> <span style={{ color: '#9333ea', fontWeight: 'bold' }}>فاتورة مبدئية / عرض سعر</span></p>
           )}
         </div>
       </div>
 
       {/* Items Table */}
-      <h3 style={styles.sectionTitle}>بنود الفاتورة</h3>
+      <h3 style={styles.sectionTitle}>{invoice.is_proforma ? 'بنود عرض السعر' : 'بنود الفاتورة'}</h3>
       <table style={styles.table}>
         <thead>
           <tr>
@@ -367,7 +390,7 @@ const PrintableInvoice = ({ invoice, settings }: PrintableInvoiceProps) => {
         </div>
 
         {/* Payments */}
-        {payments.length > 0 && (
+        {!invoice.is_proforma && payments.length > 0 && (
           <>
             <h3 style={styles.sectionTitle}>سجل الدفعات</h3>
             <table style={styles.table}>
@@ -394,10 +417,23 @@ const PrintableInvoice = ({ invoice, settings }: PrintableInvoiceProps) => {
         )}
 
         {/* Payment Summary */}
-        <div style={styles.paymentSummary}>
-          <p style={{ margin: '5px 0', fontSize: '15px' }}><strong>المبلغ المدفوع:</strong> {formatCurrency(invoice.paid_amount)}</p>
-          <p style={{ margin: '5px 0', fontSize: '15px' }}><strong>المتبقي:</strong> {formatCurrency(invoice.remaining_amount)}</p>
-        </div>
+        {invoice.is_proforma ? (
+          <div style={{
+            ...styles.paymentSummary,
+            backgroundColor: '#faf5ff',
+            borderColor: '#c4b5fd',
+            color: '#6b21a8',
+          }}>
+            <p style={{ margin: '5px 0', fontSize: '14px', fontWeight: 'bold' }}>
+              عرض سعر مبدئي - غير خاضع لأي مطالبات أو قيود مالية حتى الاعتماد الرسمي
+            </p>
+          </div>
+        ) : (
+          <div style={styles.paymentSummary}>
+            <p style={{ margin: '5px 0', fontSize: '15px' }}><strong>المبلغ المدفوع:</strong> {formatCurrency(invoice.paid_amount)}</p>
+            <p style={{ margin: '5px 0', fontSize: '15px' }}><strong>المتبقي:</strong> {formatCurrency(invoice.remaining_amount)}</p>
+          </div>
+        )}
 
         {/* Notes */}
         {invoice.notes && (
@@ -407,21 +443,42 @@ const PrintableInvoice = ({ invoice, settings }: PrintableInvoiceProps) => {
         )}
 
         {/* Stamp */}
-        <div className="print-only" style={styles.stampSection}>
-          {companyStamp ? (
-            <img
-              src={getImageUrl(companyStamp)}
-              alt="الختم"
-              style={styles.stampImage}
-            />
-          ) : (
-            <img
-              src={encodeURI('/ختم علبة.png')}
-              alt="الختم"
-              style={styles.stampImage}
-            />
-          )}
-        </div>
+        {invoice.is_proforma ? (
+          <div className="print-only" style={{
+            position: 'absolute' as const,
+            left: '12%',
+            top: '60%',
+            transform: 'translateY(-50%) rotate(-20deg)',
+            opacity: 0.35,
+            pointerEvents: 'none' as const,
+            zIndex: 10,
+            border: '3px dashed #9333ea',
+            borderRadius: '10px',
+            padding: '8px 20px',
+            color: '#7e22ce',
+            fontSize: '22px',
+            fontWeight: 'bold',
+            textAlign: 'center',
+          }}>
+            فاتورة مبدئية
+          </div>
+        ) : (
+          <div className="print-only" style={styles.stampSection}>
+            {companyStamp ? (
+              <img
+                src={getImageUrl(companyStamp)}
+                alt="الختم"
+                style={styles.stampImage}
+              />
+            ) : (
+              <img
+                src={encodeURI('/ختم علبة.png')}
+                alt="الختم"
+                style={styles.stampImage}
+              />
+            )}
+          </div>
+        )}
       </div>
 
       {/* Footer */}
@@ -463,7 +520,9 @@ export default function PrintInvoicePage() {
   // Print handler using react-to-print
   const handlePrint = useReactToPrint({
     contentRef: printRef,
-    documentTitle: invoice ? `فاتورة-${invoice.invoice_number}` : 'فاتورة',
+    documentTitle: invoice
+      ? (invoice.is_proforma ? `فاتورة-مبدئية-${invoice.proforma_number || invoice.invoice_number}` : `فاتورة-${invoice.invoice_number}`)
+      : 'فاتورة',
   })
 
   // Loading state

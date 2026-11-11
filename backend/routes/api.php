@@ -56,6 +56,7 @@ Route::middleware(['auth:sanctum', 'api.permission'])->group(function () {
     Route::post('/invoices/{invoice}/payments', [InvoiceController::class, 'addPayment']);
     Route::post('/invoices/{invoice}/archive', [InvoiceController::class, 'archive']);
     Route::post('/invoices/{invoice}/unarchive', [InvoiceController::class, 'unarchive']);
+    Route::post('/invoices/{invoice}/convert-to-final', [InvoiceController::class, 'convertToFinal']);
     Route::get('/invoices-statistics', [InvoiceController::class, 'statistics']);
 
     // Kanban Board - لوحة كانبان لمتابعة مراحل الإنتاج

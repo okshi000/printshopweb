@@ -43,7 +43,10 @@ class ItemCost extends Model
     {
         static::saved(function (ItemCost $cost) {
             if ($cost->supplier_id && !$cost->is_internal) {
-                $cost->supplier->recalculateBalance();
+                $invoice = Invoice::withoutGlobalScopes()->find($cost->invoiceItem?->invoice_id);
+                if ($invoice && !$invoice->is_proforma && !$invoice->is_archived) {
+                    $cost->supplier->recalculateBalance();
+                }
             }
         });
 

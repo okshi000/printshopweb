@@ -22,9 +22,12 @@ class InvoiceController extends Controller
     {
         $tab = $request->input('tab');
         $isArchived = $request->boolean('archived') || $request->input('archived') === 'true' || $tab === 'archived';
+        $isProforma = $request->boolean('proforma') || $request->input('proforma') === 'true' || $tab === 'proforma';
 
         if ($isArchived) {
             $query = Invoice::withoutGlobalScope('notArchived')->where('invoices.is_archived', true)->with('customer');
+        } elseif ($isProforma) {
+            $query = Invoice::withoutGlobalScope('notProforma')->where('invoices.is_proforma', true)->with('customer');
         } elseif ($tab === 'delivered') {
             $query = Invoice::with('customer')->where('status', 'delivered');
         } elseif ($tab === 'active') {
@@ -91,6 +94,7 @@ class InvoiceController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
+            'is_proforma' => 'nullable|boolean',
             'customer_id' => 'nullable|exists:customers,id',
             'invoice_date' => 'nullable|date',
             'delivery_date' => 'nullable|date',
@@ -110,9 +114,13 @@ class InvoiceController extends Controller
             'items.*.costs.*.notes' => 'nullable|string',
         ]);
 
-        $invoice = DB::transaction(function () use ($validated, $request) {
+        $isProforma = $request->boolean('is_proforma') || $request->input('is_proforma') === true || $request->input('is_proforma') === 'true';
+        $invoiceNumber = $isProforma ? Invoice::generateProformaNumber() : Invoice::generateInvoiceNumber();
+
+        $invoice = DB::transaction(function () use ($validated, $request, $isProforma, $invoiceNumber) {
             $invoice = Invoice::create([
-                'invoice_number' => Invoice::generateInvoiceNumber(),
+                'invoice_number' => $invoiceNumber,
+                'is_proforma' => $isProforma,
                 'customer_id' => $validated['customer_id'] ?? null,
                 'invoice_date' => $validated['invoice_date'] ?? now()->toDateString(),
                 'delivery_date' => $validated['delivery_date'] ?? null,
@@ -167,7 +175,8 @@ class InvoiceController extends Controller
             return $invoice;
         });
 
-        ActivityLog::log('create', 'invoices', "إنشاء فاتورة جديدة: {$invoice->invoice_number}", $invoice->id);
+        $actionTitle = $invoice->is_proforma ? "إنشاء فاتورة مبدئية جديدة: {$invoice->invoice_number}" : "إنشاء فاتورة جديدة: {$invoice->invoice_number}";
+        ActivityLog::log('create', 'invoices', $actionTitle, $invoice->id);
 
         return response()->json($invoice->load(['customer', 'items.costs', 'payments']), 201);
     }
@@ -350,6 +359,10 @@ class InvoiceController extends Controller
 
     public function addPayment(Request $request, Invoice $invoice): JsonResponse
     {
+        if ($invoice->is_proforma) {
+            return response()->json(['message' => 'لا يمكن تسجيل دفعة على فاتورة مبدئية. يرجى اعتماد الفاتورة كفاتورة نهائية أولاً.'], 422);
+        }
+
         if ($invoice->is_archived) {
             return response()->json(['message' => 'لا يمكن تسجيل دفعة على فاتورة مؤرشفة.'], 422);
         }
@@ -407,6 +420,7 @@ class InvoiceController extends Controller
         $activeInvoicesCount = Invoice::where('status', '!=', 'delivered')->count();
         $deliveredInvoicesCount = Invoice::where('status', 'delivered')->count();
         $archivedInvoicesCount = Invoice::withoutGlobalScope('notArchived')->where('invoices.is_archived', true)->count();
+        $proformaInvoicesCount = Invoice::withoutGlobalScope('notProforma')->where('invoices.is_proforma', true)->count();
 
         $responseData = [
             'period_days' => $days,
@@ -416,6 +430,7 @@ class InvoiceController extends Controller
             'active_invoices_count' => $activeInvoicesCount,
             'delivered_invoices_count' => $deliveredInvoicesCount,
             'archived_invoices_count' => $archivedInvoicesCount,
+            'proforma_invoices_count' => $proformaInvoicesCount,
             'total_sales' => round($totalSales, 2),
             'total_paid' => round($totalPaid, 2),
             'average_invoice' => $totalInvoices > 0 ? round($totalSales / $totalInvoices, 2) : 0,
@@ -484,6 +499,10 @@ class InvoiceController extends Controller
 
     public function archive(Invoice $invoice): JsonResponse
     {
+        if ($invoice->is_proforma) {
+            return response()->json(['message' => 'الفواتير المبدئية لا تؤرشف، يمكن تعديلها أو حذفها مباشرة أو اعتمادها كفاتورة نهائية.'], 422);
+        }
+
         if ($invoice->is_archived) {
             return response()->json(['message' => 'الفاتورة مؤرشفة بالفعل.'], 400);
         }
@@ -554,6 +573,72 @@ class InvoiceController extends Controller
 
         return response()->json([
             'message' => 'تم إلغاء أرشفة الفاتورة واستعادتها للحسابات المالية بنجاح.',
+            'invoice' => $invoice->fresh(['customer', 'items.costs', 'payments'])
+        ]);
+    }
+
+    public function convertToFinal(Invoice $invoice): JsonResponse
+    {
+        if (!$invoice->is_proforma) {
+            return response()->json(['message' => 'هذه الفاتورة معتمدة بالفعل كفاتورة نهائية.'], 400);
+        }
+
+        if ($invoice->is_archived) {
+            return response()->json(['message' => 'لا يمكن اعتماد فاتورة مؤرشفة.'], 422);
+        }
+
+        DB::transaction(function () use ($invoice) {
+            $oldNumber = $invoice->invoice_number;
+            $newNumber = Invoice::generateInvoiceNumber();
+
+            $invoice->update([
+                'is_proforma' => false,
+                'proforma_number' => $oldNumber,
+                'invoice_number' => $newNumber,
+                'invoice_date' => $invoice->invoice_date ?? now()->toDateString(),
+            ]);
+
+            // Create kanban cards for items if they don't have cards yet
+            $initialStage = KanbanColumn::getInitialStageKey();
+            foreach ($invoice->items as $item) {
+                if (!\App\Models\KanbanCard::where('invoice_item_id', $item->id)->exists()) {
+                    $nextSortOrder = (int) (\App\Models\KanbanCard::where('status', $initialStage)->max('sort_order') ?? 0) + 1;
+                    \App\Models\KanbanCard::create([
+                        'invoice_id' => $invoice->id,
+                        'invoice_item_id' => $item->id,
+                        'item_name' => $item->product_name ?? 'بند جديد',
+                        'description' => $item->description,
+                        'quantity' => $item->quantity ?? 1,
+                        'status' => $initialStage,
+                        'sort_order' => $nextSortOrder,
+                    ]);
+                }
+            }
+
+            // Recalculate supplier balances for any suppliers in this invoice
+            $supplierIds = $invoice->items()
+                ->with('costs')
+                ->get()
+                ->flatMap(fn($item) => $item->costs->pluck('supplier_id'))
+                ->unique()
+                ->filter();
+
+            foreach ($supplierIds as $supplierId) {
+                Supplier::find($supplierId)?->recalculateBalance();
+            }
+
+            $invoice->recalculateTotals();
+
+            ActivityLog::log(
+                'update',
+                'invoices',
+                "اعتماد الفاتورة المبدئية {$oldNumber} كفاتورة نهائية برقم {$newNumber}",
+                $invoice->id
+            );
+        });
+
+        return response()->json([
+            'message' => 'تم اعتماد الفاتورة المبدئية كفاتورة نهائية بنجاح وإدراجها في الحسابات ومراحل العمل.',
             'invoice' => $invoice->fresh(['customer', 'items.costs', 'payments'])
         ]);
     }

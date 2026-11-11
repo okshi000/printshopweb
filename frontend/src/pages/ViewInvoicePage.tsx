@@ -10,7 +10,7 @@ import { ar } from 'date-fns/locale'
 import {
   ArrowLeft, Printer, Edit, CreditCard, User, Phone, Calendar, Clock, 
   CheckCircle2, AlertCircle, Loader2, Package, Coins, Receipt, Trash2,
-  Archive, ArchiveRestore, Info, ExternalLink, MessageCircle, Tag
+  Archive, ArchiveRestore, Info, ExternalLink, MessageCircle, Tag, FileClock, Check
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -86,6 +86,8 @@ interface Invoice {
   status: string
   is_archived?: boolean
   archived_at?: string | null
+  is_proforma?: boolean
+  proforma_number?: string | null
   subtotal?: number
   discount?: number
   total_amount: number
@@ -120,6 +122,7 @@ export default function ViewInvoicePage() {
   const [paymentNotes, setPaymentNotes] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [archiveConfirm, setArchiveConfirm] = useState(false)
+  const [convertConfirm, setConvertConfirm] = useState(false)
   const [discountOpen, setDiscountOpen] = useState(false)
   const [discountVal, setDiscountVal] = useState('')
   const [discountType, setDiscountType] = useState<'fixed' | 'percentage'>('fixed')
@@ -131,6 +134,20 @@ export default function ViewInvoicePage() {
       return res.data.data || res.data
     },
     enabled: !!id,
+  })
+
+  const convertToFinalMutation = useMutation({
+    mutationFn: async () => invoicesApi.convertToFinal(Number(id)),
+    onSuccess: (res) => {
+      toast.success(res.data?.message || 'تم اعتماد الفاتورة المبدئية كفاتورة نهائية بنجاح')
+      queryClient.invalidateQueries({ queryKey: ['invoice', id] })
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      queryClient.invalidateQueries({ queryKey: ['invoices-statistics-tab-counts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['kanban'] })
+      setConvertConfirm(false)
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message || 'فشل اعتماد الفاتورة كفاتورة نهائية'),
   })
 
   const paymentMutation = useMutation({
@@ -259,24 +276,53 @@ export default function ViewInvoicePage() {
           <Button variant="ghost" size="icon" onClick={() => navigate('/invoices')}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg">
-            <Receipt className="h-6 w-6 text-white" />
+          <div className={cn(
+            "flex h-12 w-12 items-center justify-center rounded-xl shadow-lg",
+            invoice.is_proforma
+              ? "bg-gradient-to-br from-purple-500 to-indigo-600"
+              : "bg-gradient-to-br from-blue-500 to-indigo-600"
+          )}>
+            {invoice.is_proforma ? (
+              <FileClock className="h-6 w-6 text-white" />
+            ) : (
+              <Receipt className="h-6 w-6 text-white" />
+            )}
           </div>
           <div>
-            <h1 className="text-2xl font-bold">فاتورة #{invoice.invoice_number}</h1>
+            <h1 className="text-2xl font-bold">
+              {invoice.is_proforma ? `فاتورة مبدئية #${invoice.proforma_number || invoice.invoice_number}` : `فاتورة #${invoice.invoice_number}`}
+            </h1>
             <p className="text-sm text-muted-foreground">
               {formatDate(invoice.created_at, 'PPP', { locale: ar })}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {invoice.is_proforma && (
+            <Badge variant="outline" className="gap-1 bg-purple-50 text-purple-700 border-purple-300 dark:bg-purple-950 dark:text-purple-300">
+              <FileClock className="h-3.5 w-3.5" />
+              فاتورة مبدئية
+            </Badge>
+          )}
           {invoice.is_archived && (
             <Badge variant="outline" className="gap-1 bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-300">
               <Archive className="h-3.5 w-3.5" />
               مؤرشفة
             </Badge>
           )}
-          <Badge className={cn('gap-1', status.color)}>{status.icon}{status.label}</Badge>
+          {!invoice.is_proforma && (
+            <Badge className={cn('gap-1', status.color)}>{status.icon}{status.label}</Badge>
+          )}
+          {invoice.is_proforma && hasPermission('edit invoices') && (
+            <Button
+              size="sm"
+              className="gap-1 bg-purple-600 hover:bg-purple-700 text-white shadow-sm"
+              onClick={() => setConvertConfirm(true)}
+              disabled={convertToFinalMutation.isPending}
+            >
+              <Check className="h-4 w-4" /> اعتماد كفاتورة نهائية
+            </Button>
+          )}
           <Link to={`/invoices/${id}/print`}>
             <Button variant="outline" size="sm" className="gap-1">
               <Printer className="h-4 w-4" /> طباعة
@@ -289,12 +335,12 @@ export default function ViewInvoicePage() {
               </Button>
             </Link>
           )}
-          {!invoice.is_archived && (
+          {!invoice.is_archived && !invoice.is_proforma && (
             <Button size="sm" className="gap-1" onClick={() => setPaymentOpen(true)} disabled={invoice.remaining_amount <= 0}>
               <CreditCard className="h-4 w-4" /> تسجيل دفعة
             </Button>
           )}
-          {hasPermission('edit invoices') && (
+          {!invoice.is_proforma && hasPermission('edit invoices') && (
             invoice.is_archived ? (
               <Button
                 variant="outline"
@@ -328,6 +374,28 @@ export default function ViewInvoicePage() {
           </Button>
         </div>
       </motion.div>
+
+      {invoice.is_proforma && (
+        <div className="rounded-xl border border-purple-500/30 bg-purple-500/10 p-4 text-purple-900 dark:text-purple-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <FileClock className="h-5 w-5 mt-0.5 shrink-0 text-purple-600 dark:text-purple-400" />
+            <div className="text-sm">
+              <span className="font-semibold block mb-0.5">تنبيه: هذه فاتورة مبدئية / عرض سعر</span>
+              هذه الفاتورة معزولة تماماً عن الحسابات المالية (لا تؤثر على الخزينة، الأرباح، ديون العميل، أو حسابات الموردين)، ولم يتم إدراجها في خط الإنتاج بعد. يمكنك مراجعتها وطباعتها وتعديلها، ثم اعتمادها كفاتورة نهائية عند التأكيد.
+            </div>
+          </div>
+          {hasPermission('edit invoices') && (
+            <Button
+              size="sm"
+              className="shrink-0 gap-1 bg-purple-600 hover:bg-purple-700 text-white self-start sm:self-auto"
+              onClick={() => setConvertConfirm(true)}
+              disabled={convertToFinalMutation.isPending}
+            >
+              <Check className="h-4 w-4" /> اعتماد الآن
+            </Button>
+          )}
+        </div>
+      )}
 
       {invoice.is_archived && (
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-800 dark:text-amber-300 flex items-start gap-3">
@@ -567,10 +635,16 @@ export default function ViewInvoicePage() {
                 <span className="font-bold text-lg text-primary">{formatCurrency(invoice.total_amount)}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">حالة الدفع:</span>
-                <Badge className={cn("gap-1", getPaymentStatusColor(getPaymentStatus(invoice.total_amount, invoice.paid_amount)))}>
-                  {getPaymentStatusLabel(getPaymentStatus(invoice.total_amount, invoice.paid_amount))}
-                </Badge>
+                <span className="text-muted-foreground">حالة الفاتورة:</span>
+                {invoice.is_proforma ? (
+                  <Badge variant="outline" className="gap-1 bg-purple-50 text-purple-700 border-purple-300 dark:bg-purple-950 dark:text-purple-300">
+                    <FileClock className="h-3 w-3" /> مبدئية (لا تسجل دفعات)
+                  </Badge>
+                ) : (
+                  <Badge className={cn("gap-1", getPaymentStatusColor(getPaymentStatus(invoice.total_amount, invoice.paid_amount)))}>
+                    {getPaymentStatusLabel(getPaymentStatus(invoice.total_amount, invoice.paid_amount))}
+                  </Badge>
+                )}
               </div>
               {hasPermission('invoices.view_costs') && (
                 <div className="flex justify-between">
@@ -602,21 +676,40 @@ export default function ViewInvoicePage() {
           {/* Status Update */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">تحديث الحالة</CardTitle>
+              <CardTitle className="text-lg">
+                {invoice.is_proforma ? 'حالة الاعتماد' : 'تحديث الحالة'}
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <Select value={invoice.status} onValueChange={(v) => statusMutation.mutate(v)} disabled={statusMutation.isPending}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="new">جديدة</SelectItem>
-                  <SelectItem value="in_progress">قيد التنفيذ</SelectItem>
-                  <SelectItem value="ready">جاهزة</SelectItem>
-                  <SelectItem value="delivered">تم التسليم</SelectItem>
-                  <SelectItem value="cancelled">ملغاة</SelectItem>
-                </SelectContent>
-              </Select>
+              {invoice.is_proforma ? (
+                <div className="space-y-3">
+                  <div className="rounded-lg bg-purple-500/10 border border-purple-500/20 p-3 text-xs text-purple-900 dark:text-purple-200">
+                    هذه الفاتورة مبدئية ولم تدخل خط الإنتاج بعد. لاعتمادها وبدء مراحل العمل وإدخالها في المالية، اضغط الزر أدناه.
+                  </div>
+                  {hasPermission('edit invoices') && (
+                    <Button
+                      className="w-full gap-2 bg-purple-600 hover:bg-purple-700 text-white"
+                      onClick={() => setConvertConfirm(true)}
+                      disabled={convertToFinalMutation.isPending}
+                    >
+                      <Check className="h-4 w-4" /> اعتماد كفاتورة نهائية
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <Select value={invoice.status} onValueChange={(v) => statusMutation.mutate(v)} disabled={statusMutation.isPending}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="new">جديدة</SelectItem>
+                    <SelectItem value="in_progress">قيد التنفيذ</SelectItem>
+                    <SelectItem value="ready">جاهزة</SelectItem>
+                    <SelectItem value="delivered">تم التسليم</SelectItem>
+                    <SelectItem value="cancelled">ملغاة</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </CardContent>
           </Card>
         </motion.div>
@@ -745,6 +838,55 @@ export default function ViewInvoicePage() {
             >
               <Archive className="h-4 w-4" />
               {archiveMutation.isPending ? 'جاري الأرشفة...' : 'تأكيد الأرشفة'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Convert To Final Confirmation Dialog */}
+      <Dialog open={convertConfirm} onOpenChange={setConvertConfirm}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-purple-600">
+              <Check className="h-5 w-5" />
+              تأكيد اعتماد الفاتورة كفاتورة نهائية
+            </DialogTitle>
+            <DialogDescription className="space-y-3 pt-2 text-foreground/80">
+              <p>
+                هل ترغب في اعتماد الفاتورة المبدئية رقم{' '}
+                <span className="font-bold text-foreground">#{invoice.proforma_number || invoice.invoice_number}</span> وتحويلها إلى فاتورة نهائية ورسمية؟
+              </p>
+              <div className="rounded-lg bg-purple-500/10 border border-purple-500/20 p-3 text-xs space-y-1 text-purple-950 dark:text-purple-200">
+                <p className="font-semibold">عند الاعتماد سيتم تلقائياً:</p>
+                <ul className="list-disc list-inside space-y-0.5">
+                  <li>توليد رقم فاتورة رسمي نهائي (INV-YYYY-XXXX).</li>
+                  <li>إدراج الفاتورة في الحسابات المالية، الإيرادات، وديون العميل.</li>
+                  <li>تحديث أرصدة الموردين وإدراج بنود الفاتورة في لوحة خط الإنتاج (كانبان).</li>
+                  <li>إتاحة تسجيل الدفعات النقدية والتحويلات عليها.</li>
+                </ul>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setConvertConfirm(false)}>
+              إلغاء
+            </Button>
+            <Button
+              className="bg-purple-600 hover:bg-purple-700 text-white gap-2"
+              onClick={() => convertToFinalMutation.mutate()}
+              disabled={convertToFinalMutation.isPending}
+            >
+              {convertToFinalMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  جاري الاعتماد...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4" />
+                  تأكيد الاعتماد النهائي
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

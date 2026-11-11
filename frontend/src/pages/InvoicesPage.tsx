@@ -10,6 +10,7 @@ import {
   Banknote,
   Search,
   FileText,
+  FileClock,
   Calendar,
   Filter,
   AlertCircle,
@@ -91,12 +92,12 @@ export default function InvoicesPage() {
   const [page, setPage] = useState(1);
   
   const currentTabParam = searchParams.get('tab');
-  const activeTab: 'active' | 'delivered' | 'archived' = 
-    currentTabParam === 'delivered' || currentTabParam === 'archived' 
+  const activeTab: 'active' | 'delivered' | 'proforma' | 'archived' = 
+    currentTabParam === 'delivered' || currentTabParam === 'archived' || currentTabParam === 'proforma'
       ? currentTabParam 
       : 'active';
 
-  const handleTabChange = (newTab: 'active' | 'delivered' | 'archived') => {
+  const handleTabChange = (newTab: 'active' | 'delivered' | 'proforma' | 'archived') => {
     setSearchParams(prev => {
       const updated = new URLSearchParams(prev);
       updated.set('tab', newTab);
@@ -109,6 +110,7 @@ export default function InvoicesPage() {
 
   const [invoiceToArchive, setInvoiceToArchive] = useState<Invoice | null>(null);
   const [invoiceToUnarchive, setInvoiceToUnarchive] = useState<Invoice | null>(null);
+  const [invoiceToConvert, setInvoiceToConvert] = useState<Invoice | null>(null);
   const [isActionPending, setIsActionPending] = useState(false);
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState<string>('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>('');
@@ -144,6 +146,9 @@ export default function InvoicesPage() {
       const params: Record<string, string | number> = { page, per_page: 10, tab: activeTab };
       if (activeTab === 'archived') {
         params.archived = 'true';
+      }
+      if (activeTab === 'proforma') {
+        params.proforma = 'true';
       }
       if (invoiceStatusFilter) params.status = invoiceStatusFilter;
       if (debouncedSearch) params.search = debouncedSearch;
@@ -241,6 +246,24 @@ export default function InvoicesPage() {
     }
   };
 
+  const handleConfirmConvertToFinal = async () => {
+    if (!invoiceToConvert) return;
+    try {
+      setIsActionPending(true);
+      const res = await invoicesApi.convertToFinal(invoiceToConvert.id);
+      toast.success(res.data?.message || `تم اعتماد الفاتورة ${invoiceToConvert.invoice_number} كفاتورة نهائية بنجاح`);
+      setInvoiceToConvert(null);
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices-statistics-tab-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['kanban'] });
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'فشل اعتماد الفاتورة كفاتورة نهائية');
+    } finally {
+      setIsActionPending(false);
+    }
+  };
+
   const hasActiveFilters = invoiceStatusFilter || paymentStatusFilter || dateFrom || dateTo || searchTerm || sortByDeliveryDate;
 
   const exportHeaders = [
@@ -274,6 +297,7 @@ export default function InvoicesPage() {
   const buildExportParams = (targetPage: number) => {
     const params: Record<string, string | number> = { page: targetPage, per_page: 200, tab: activeTab };
     if (activeTab === 'archived') params.archived = 'true';
+    if (activeTab === 'proforma') params.proforma = 'true';
     if (invoiceStatusFilter) params.status = invoiceStatusFilter;
     if (debouncedSearch) params.search = debouncedSearch;
     if (dateFrom) params.date_from = dateFrom.toISOString().split('T')[0];
@@ -455,18 +479,28 @@ export default function InvoicesPage() {
             {isExporting ? 'جاري التصدير...' : 'تصدير Excel'}
           </Button>
           {hasPermission('create invoices') && (
-            <Button
-              onClick={() => navigate('/invoices/create')}
-              className="gap-2 shadow-lg shadow-blue-500/25"
-            >
-              <Plus className="h-4 w-4" />
-              إنشاء فاتورة
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                onClick={() => navigate('/invoices/create?type=proforma')}
+                className="gap-2 border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-800 dark:text-purple-300 dark:hover:bg-purple-950/50"
+              >
+                <FileClock className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                فاتورة مبدئية جديدة
+              </Button>
+              <Button
+                onClick={() => navigate('/invoices/create')}
+                className="gap-2 shadow-lg shadow-blue-500/25"
+              >
+                <Plus className="h-4 w-4" />
+                إنشاء فاتورة
+              </Button>
+            </>
           )}
         </div>
       </div>
 
-      {/* Tabs for Active vs Delivered vs Archived Invoices */}
+      {/* Tabs for Active vs Delivered vs Proforma vs Archived Invoices */}
       <div className="flex border-b border-border/60 gap-2 sm:gap-4 overflow-x-auto">
         <button
           type="button"
@@ -516,6 +550,33 @@ export default function InvoicesPage() {
 
         <button
           type="button"
+          onClick={() => handleTabChange('proforma')}
+          className={cn(
+            "flex items-center gap-2 pb-3 px-3 font-medium text-sm transition-all border-b-2 -mb-px whitespace-nowrap",
+            activeTab === 'proforma'
+              ? "border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400 font-semibold"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <FileClock className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+          <span>الفواتير المبدئية</span>
+          {statsData?.proforma_invoices_count !== undefined && (
+            <Badge 
+              variant="outline" 
+              className={cn(
+                "mr-1 text-xs font-mono",
+                activeTab === 'proforma'
+                  ? "bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950/60 dark:text-purple-300"
+                  : "bg-muted text-muted-foreground"
+              )}
+            >
+              {statsData.proforma_invoices_count}
+            </Badge>
+          )}
+        </button>
+
+        <button
+          type="button"
           onClick={() => handleTabChange('archived')}
           className={cn(
             "flex items-center gap-2 pb-3 px-3 font-medium text-sm transition-all border-b-2 -mb-px whitespace-nowrap",
@@ -541,6 +602,16 @@ export default function InvoicesPage() {
           )}
         </button>
       </div>
+
+      {activeTab === 'proforma' && (
+        <div className="rounded-xl border border-purple-500/30 bg-purple-500/10 p-4 text-purple-900 dark:text-purple-200 flex items-start gap-3">
+          <FileClock className="h-5 w-5 mt-0.5 shrink-0 text-purple-600 dark:text-purple-400" />
+          <div className="text-sm">
+            <span className="font-semibold block mb-0.5">قسم الفواتير المبدئية (عروض الأسعار):</span>
+            يحتوي هذا القسم على جميع الفواتير المبدئية المسجلة. هذه الفواتير لا تدخل إطلاقاً في أي حسابات مالية، ولا تؤثر على ديون العملاء أو الموردين أو الخزنة، ولا تظهر في مراحل العمل (كانبان) حتى تقوم باعتمادها كفاتورة نهائية.
+          </div>
+        </div>
+      )}
 
       {activeTab === 'delivered' && (
         <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-900 dark:text-emerald-200 flex items-start gap-3">
@@ -686,13 +757,20 @@ export default function InvoicesPage() {
             <span>
               {activeTab === 'archived' 
                 ? 'فواتير الأرشيف (مرجع بيانات)' 
-                : activeTab === 'delivered'
-                  ? 'فواتير تم التسليم'
-                  : 'قائمة الفواتير النشطة'}
+                : activeTab === 'proforma'
+                  ? 'قائمة الفواتير المبدئية (عروض الأسعار)'
+                  : activeTab === 'delivered'
+                    ? 'فواتير تم التسليم'
+                    : 'قائمة الفواتير النشطة'}
             </span>
             {activeTab === 'archived' && (
               <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-300">
                 مستبعدة من الحسابات المالية
+              </Badge>
+            )}
+            {activeTab === 'proforma' && (
+              <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-300 dark:bg-purple-950 dark:text-purple-300">
+                مبدئية وغير معتمدة مالياً
               </Badge>
             )}
             {activeTab === 'delivered' && (
@@ -711,9 +789,11 @@ export default function InvoicesPage() {
             {data?.total || 0}{' '}
             {activeTab === 'archived' 
               ? 'فاتورة مؤرشفة' 
-              : activeTab === 'delivered'
-                ? 'فاتورة تم تسليمها بنجاح للعميل'
-                : 'فاتورة نشطة لم يتم تسليمها بعد'}
+              : activeTab === 'proforma'
+                ? 'فاتورة مبدئية مسجلة'
+                : activeTab === 'delivered'
+                  ? 'فاتورة تم تسليمها بنجاح للعميل'
+                  : 'فاتورة نشطة لم يتم تسليمها بعد'}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -771,12 +851,16 @@ export default function InvoicesPage() {
                                 "h-10 w-10 rounded-lg flex items-center justify-center",
                                 invoice.is_archived
                                   ? "bg-amber-500/15 text-amber-600"
-                                  : invoice.status === 'delivered'
-                                    ? "bg-emerald-500/15 text-emerald-600"
-                                    : "bg-gradient-to-br from-blue-500/20 to-blue-500/10 text-blue-500"
+                                  : invoice.is_proforma
+                                    ? "bg-purple-500/15 text-purple-600"
+                                    : invoice.status === 'delivered'
+                                      ? "bg-emerald-500/15 text-emerald-600"
+                                      : "bg-gradient-to-br from-blue-500/20 to-blue-500/10 text-blue-500"
                               )}>
                                 {invoice.is_archived ? (
                                   <Archive className="h-5 w-5" />
+                                ) : invoice.is_proforma ? (
+                                  <FileClock className="h-5 w-5" />
                                 ) : invoice.status === 'delivered' ? (
                                   <CheckCircle2 className="h-5 w-5" />
                                 ) : (
@@ -790,7 +874,12 @@ export default function InvoicesPage() {
                                     مؤرشفة
                                   </Badge>
                                 )}
-                                {invoice.status === 'delivered' && !invoice.is_archived && (
+                                {invoice.is_proforma && (
+                                  <Badge variant="outline" className="w-fit text-[10px] py-0 px-1.5 mt-0.5 bg-purple-50 text-purple-700 border-purple-300 dark:bg-purple-950/50 dark:text-purple-400">
+                                    فاتورة مبدئية
+                                  </Badge>
+                                )}
+                                {invoice.status === 'delivered' && !invoice.is_archived && !invoice.is_proforma && (
                                   <Badge variant="outline" className="w-fit text-[10px] py-0 px-1.5 mt-0.5 bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/50 dark:text-emerald-400">
                                     تم التسليم
                                   </Badge>
@@ -843,7 +932,12 @@ export default function InvoicesPage() {
                             </span>
                           </TableCell>
                           <TableCell>
-                            {!invoice.is_archived && hasPermission('edit invoices') ? (
+                            {invoice.is_proforma ? (
+                              <Badge variant="outline" className="gap-1 bg-purple-50 text-purple-700 border-purple-300 dark:bg-purple-950/60 dark:text-purple-300 font-medium">
+                                <FileClock className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                                <span>مبدئية</span>
+                              </Badge>
+                            ) : !invoice.is_archived && hasPermission('edit invoices') ? (
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <button
@@ -915,14 +1009,20 @@ export default function InvoicesPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <Badge className={cn("gap-1", getPaymentStatusColor(getPaymentStatus(total, paid)))}>
-                              {getPaymentStatusLabel(getPaymentStatus(total, paid))}
-                            </Badge>
+                            {invoice.is_proforma ? (
+                              <Badge variant="secondary" className="gap-1 bg-muted text-muted-foreground border-transparent text-xs">
+                                غير معتمدة
+                              </Badge>
+                            ) : (
+                              <Badge className={cn("gap-1", getPaymentStatusColor(getPaymentStatus(total, paid)))}>
+                                {getPaymentStatusLabel(getPaymentStatus(total, paid))}
+                              </Badge>
+                            )}
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center justify-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                               {/* Quick Deliver or Revert Action */}
-                              {!invoice.is_archived && hasPermission('edit invoices') && (
+                              {!invoice.is_archived && !invoice.is_proforma && hasPermission('edit invoices') && (
                                 activeTab === 'active' && invoice.status !== 'delivered' ? (
                                   <Button
                                     variant="ghost"
@@ -948,6 +1048,19 @@ export default function InvoicesPage() {
                                 ) : null
                               )}
 
+                              {/* Quick Convert Proforma to Final */}
+                              {invoice.is_proforma && hasPermission('edit invoices') && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950"
+                                  title="اعتماد كفاتورة نهائية"
+                                  onClick={() => setInvoiceToConvert(invoice)}
+                                >
+                                  <Check className="h-4 w-4" />
+                                </Button>
+                              )}
+
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -957,7 +1070,7 @@ export default function InvoicesPage() {
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              {!invoice.is_archived && hasPermission('edit invoices') && invoice.status === 'draft' && (
+                              {!invoice.is_archived && hasPermission('edit invoices') && (invoice.status === 'draft' || invoice.is_proforma) && (
                                 <Button
                                   variant="ghost"
                                   size="icon"
@@ -968,7 +1081,7 @@ export default function InvoicesPage() {
                                   <Pencil className="h-4 w-4" />
                                 </Button>
                               )}
-                              {!invoice.is_archived && hasPermission('create invoice_payments') && remaining > 0 && invoice.status !== 'cancelled' && (
+                              {!invoice.is_archived && !invoice.is_proforma && hasPermission('create invoice_payments') && remaining > 0 && invoice.status !== 'cancelled' && (
                                 <Button
                                   variant="ghost"
                                   size="icon"
@@ -989,7 +1102,7 @@ export default function InvoicesPage() {
                                 <Printer className="h-4 w-4" />
                               </Button>
 
-                              {hasPermission('edit invoices') && (
+                              {hasPermission('edit invoices') && !invoice.is_proforma && (
                                 invoice.is_archived ? (
                                   <Button
                                     variant="ghost"
@@ -1044,6 +1157,8 @@ export default function InvoicesPage() {
                       <CheckCircle2 className="h-10 w-10 text-emerald-500" />
                     ) : activeTab === 'archived' ? (
                       <Archive className="h-10 w-10 text-amber-500" />
+                    ) : activeTab === 'proforma' ? (
+                      <FileClock className="h-10 w-10 text-purple-500" />
                     ) : (
                       <Receipt className="h-10 w-10 text-muted-foreground" />
                     )}
@@ -1053,7 +1168,9 @@ export default function InvoicesPage() {
                       ? 'لا توجد فواتير مسلّمة'
                       : activeTab === 'archived'
                         ? 'لا توجد فواتير مؤرشفة'
-                        : 'لا توجد فواتير نشطة'}
+                        : activeTab === 'proforma'
+                          ? 'لا توجد فواتير مبدئية'
+                          : 'لا توجد فواتير نشطة'}
                   </h3>
                   <p className="text-muted-foreground mb-4">
                     {hasActiveFilters
@@ -1062,8 +1179,16 @@ export default function InvoicesPage() {
                         ? 'عند تحويل حالة أي فاتورة إلى "تم التسليم"، ستنتقل مباشرة إلى هذا القسم'
                         : activeTab === 'archived'
                           ? 'لا توجد فواتير مؤرشفة حالياً'
-                          : 'جميع الفواتير تم تسليمها أو يمكنك إنشاء فاتورة جديدة'}
+                          : activeTab === 'proforma'
+                            ? 'يمكنك إنشاء فاتورة مبدئية (عرض سعر) جديدة دون التأثير على أي حسابات مالية'
+                            : 'جميع الفواتير تم تسليمها أو يمكنك إنشاء فاتورة جديدة'}
                   </p>
+                  {hasPermission('create invoices') && !hasActiveFilters && activeTab === 'proforma' && (
+                    <Button onClick={() => navigate('/invoices/create?type=proforma')} className="bg-purple-600 hover:bg-purple-700 text-white">
+                      <Plus className="h-4 w-4 ml-2" />
+                      إنشاء فاتورة مبدئية
+                    </Button>
+                  )}
                   {hasPermission('create invoices') && !hasActiveFilters && activeTab === 'active' && (
                     <Button onClick={() => navigate('/invoices/create')}>
                       <Plus className="h-4 w-4 ml-2" />
@@ -1140,6 +1265,43 @@ export default function InvoicesPage() {
             >
               <ArchiveRestore className="h-4 w-4" />
               {isActionPending ? 'جاري الاستعادة...' : 'استعادة الفاتورة'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Convert Proforma to Final Confirmation Dialog */}
+      <Dialog open={!!invoiceToConvert} onOpenChange={(open) => !open && setInvoiceToConvert(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-purple-600">
+              <CheckCircle2 className="h-5 w-5" />
+              اعتماد الفاتورة كفاتورة نهائية
+            </DialogTitle>
+            <DialogDescription className="space-y-3 pt-2 text-foreground/80">
+              <p>
+                هل أنت متأكد من اعتماد الفاتورة المبدئية رقم{' '}
+                <span className="font-bold text-foreground">{invoiceToConvert?.invoice_number}</span> كفاتورة نهائية؟
+              </p>
+              <div className="rounded-lg bg-purple-500/10 border border-purple-500/20 p-3 text-xs text-purple-900 dark:text-purple-300 space-y-1">
+                <p className="font-semibold">عند الاعتماد:</p>
+                <p>• سيتم تخصيص رقم فاتورة رسمي رسمي ونقلها لقسم الفواتير النشطة.</p>
+                <p>• ستدخل الفاتورة في كافة الحسابات المالية (الإيرادات، الأرباح، ديون العملاء والموردين).</p>
+                <p>• سيتم إنشاء كروت مراحل العمل تلقائياً في لوحة كانبان.</p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setInvoiceToConvert(null)} disabled={isActionPending}>
+              إلغاء
+            </Button>
+            <Button
+              className="bg-purple-600 hover:bg-purple-700 text-white gap-2"
+              onClick={handleConfirmConvertToFinal}
+              disabled={isActionPending}
+            >
+              <Check className="h-4 w-4" />
+              {isActionPending ? 'جاري الاعتماد...' : 'تأكيد واعتماد نهائي'}
             </Button>
           </DialogFooter>
         </DialogContent>
